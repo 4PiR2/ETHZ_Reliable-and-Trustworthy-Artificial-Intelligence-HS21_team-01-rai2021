@@ -11,6 +11,7 @@ def get_const(x, shape=1, device='cpu', ref=None):
 	else:
 		return x * torch.ones(shape, dtype=torch.float64, device=device)
 
+
 def spu_0(x):
 	# spu function (optimized)
 	y = get_const(0., ref=x)
@@ -19,6 +20,7 @@ def spu_0(x):
 	mask = ~mask
 	y[mask] = -torch.sigmoid(x[mask])
 	return y
+
 
 def spu_1(x):
 	# 1-order derivative
@@ -31,16 +33,19 @@ def spu_1(x):
 	y[mask] = f(torch.sigmoid(x[mask]))
 	return y
 
+
 def get_tanget(t):
 	w = spu_1(t)
 	b = spu_0(t) - w * t
 	return w, b
+
 
 def get_scant(p, q):
 	m, n = spu_0(p), spu_0(q)
 	w = (n - m) / (q - p)
 	b = m - w * p
 	return w, b
+
 
 def case_0ltu(l, u, t=None):
 	# case 0 <= l <= t <= u
@@ -57,6 +62,7 @@ def case_0ltu(l, u, t=None):
 		b_l = - t ** 2 - .5
 	return w_l, b_l, w_u, b_u
 
+
 def case_ltu0(l, u, t=None):
 	# case l <= t <= u <= 0
 	# L: scant @ l, u
@@ -72,6 +78,7 @@ def case_ltu0(l, u, t=None):
 	w_u = s_t * (s_t - 1.)
 	b_u = - w_u * t - s_t
 	return w_l, b_l, w_u, b_u
+
 
 def case_l0tu(l, u, t):
 	# case l < 0 <= t <= u
@@ -92,6 +99,7 @@ def case_l0tu(l, u, t):
 	w_u[mask] = w_u_2[mask]
 	b_u[mask] = - w_u_2[mask] * l[mask] - s_l[mask]
 	return w_l, b_l, w_u, b_u
+
 
 def case_lt0u(l, u, t):
 	# case l <= t < 0 < u
@@ -124,6 +132,7 @@ def case_lt0u(l, u, t):
 	b_u[mask1] = b_u_2
 	return w_l, b_l, w_u, b_u
 
+
 def case_l0u(l, u, t=None):
 	# case l < 0 < u
 	if t is None:
@@ -137,6 +146,7 @@ def case_l0u(l, u, t=None):
 	mask = ~mask
 	w_l[mask], b_l[mask], w_u[mask], b_u[mask] = case_lt0u(l[mask], u[mask], t[mask])
 	return w_l, b_l, w_u, b_u
+
 
 def compute_linear_bounds(l, u):
 	# minimum area
@@ -154,6 +164,7 @@ def compute_linear_bounds(l, u):
 	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3])
 	return (w_l, b_l), (w_u, b_u)
 
+
 def compute_linear_bounds_boxlike(l, u):
 	# optimal box-comparable
 	# input: n-dim vector l, u (float64 tensor)
@@ -169,6 +180,7 @@ def compute_linear_bounds_boxlike(l, u):
 	mask3 = ~torch.bitwise_or(mask1, mask2)
 	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3], t=get_const(0., ref=l[mask3]))
 	return (w_l, b_l), (w_u, b_u)
+
 
 def compute_linear_bounds_box(l, u):
 	# box, not recommended
@@ -186,6 +198,7 @@ def compute_linear_bounds_box(l, u):
 	mask3 = ~torch.bitwise_or(mask1, mask2)
 	b_l[mask3], b_u[mask3] = get_const(-.5, ref=l[mask3]), torch.maximum(y_l[mask3], y_u[mask3])
 	return (w_l, b_l), (w_u, b_u)
+
 
 if __name__ == '__main__':
 	# test
@@ -205,6 +218,7 @@ if __name__ == '__main__':
 
 	if visualize > 0:
 		import matplotlib.pyplot as plt
+
 		for i in range(visualize):
 			plt.plot(x[:, i], y[:, i], c='k')
 			plt.plot([l[i]] * 2, [w_l[i] * l[i] + b_l[i], w_u[i] * l[i] + b_u[i]], c='g')
