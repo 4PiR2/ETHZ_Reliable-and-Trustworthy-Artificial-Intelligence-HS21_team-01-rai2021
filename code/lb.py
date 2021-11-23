@@ -77,7 +77,7 @@ def case_l0tu(l, u, t):
 	# case l < 0 <= t <= u
 	# L: tangent @ t
 	# U1: scant @ l, u
-	# U2: tangent @ l
+	# U2: tangent @ l, never used for u >= -l
 	w_l = 2. * t
 	b_l = - t ** 2 - .5
 	s_l = torch.sigmoid(l)
