@@ -2,7 +2,7 @@ import torch
 
 
 def get_const(x, shape=1, device='cpu', ref=None):
-	# get a tensor with constant numbers
+	# get a tensor of constant numbers
 	if ref is not None:
 		shape = ref.shape
 		device = ref.device
@@ -46,6 +46,7 @@ def case_l0tu(l, u, t):
 	# case l < 0 <= t < u
 	# L: tangent @ t
 	# U: scant @ l, u
+	# warning: U is only verified with t <= (l + u) * .5
 	w_l = 2. * t
 	b_l = - t ** 2 - .5
 	s_l = torch.sigmoid(l)
@@ -130,7 +131,7 @@ def spu_1(x):
 	mask = x >= 0.
 	y[mask] = 2. * x[mask]
 	mask = ~mask
-	f = lambda a: a * (a - 1.)
+	f = lambda s: s * (s - 1.)
 	y[mask] = f(torch.sigmoid(x[mask]))
 	return y
 
