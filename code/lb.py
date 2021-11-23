@@ -36,10 +36,10 @@ def get_tanget(t):
 	b = spu_0(t) - w * t
 	return w, b
 
-def get_scant(a, b):
-	ya, yb = spu_0(a), spu_0(b)
-	w = (yb - ya) / (b - a)
-	b = ya - w * a
+def get_scant(p, q):
+	m, n = spu_0(p), spu_0(q)
+	w = (n - m) / (q - p)
+	b = m - w * p
 	return w, b
 
 def case_0ltu(l, u, t=None):
@@ -139,6 +139,7 @@ def case_l0u(l, u, t=None):
 	return w_l, b_l, w_u, b_u
 
 def compute_linear_bounds(l, u):
+	# minimum area
 	# input: n-dim vector l, u (float64 tensor)
 	# output: n-dim vector w_l, b_l, w_u, b_u (float64 tensor)
 	w_l = get_const(0., ref=l)
@@ -153,6 +154,38 @@ def compute_linear_bounds(l, u):
 	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3])
 	return (w_l, b_l), (w_u, b_u)
 
+def compute_linear_bounds_boxlike(l, u):
+	# optimal box-comparable
+	# input: n-dim vector l, u (float64 tensor)
+	# output: n-dim vector w_l, b_l, w_u, b_u (float64 tensor)
+	w_l = get_const(0., ref=l)
+	b_l = get_const(0., ref=l)
+	w_u = get_const(0., ref=l)
+	b_u = get_const(0., ref=l)
+	mask1 = l >= 0.
+	w_l[mask1], b_l[mask1], w_u[mask1], b_u[mask1] = case_0ltu(l[mask1], u[mask1], t=l[mask1])
+	mask2 = u <= 0.
+	w_l[mask2], b_l[mask2], w_u[mask2], b_u[mask2] = case_ltu0(l[mask2], u[mask2], t=l[mask2])
+	mask3 = ~torch.bitwise_or(mask1, mask2)
+	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3], t=get_const(0., ref=l[mask3]))
+	return (w_l, b_l), (w_u, b_u)
+
+def compute_linear_bounds_box(l, u):
+	# box, not recommended
+	# input: n-dim vector l, u (float64 tensor)
+	# output: n-dim vector w_l, b_l, w_u, b_u (float64 tensor)
+	w_l = get_const(0., ref=l)
+	w_u = w_l
+	y_l, y_u = spu_0(l), spu_0(u)
+	b_l = get_const(0., ref=l)
+	b_u = get_const(0., ref=l)
+	mask1 = l >= 0.
+	b_l[mask1], b_u[mask1] = y_l[mask1], y_u[mask1]
+	mask2 = u <= 0.
+	b_l[mask2], b_u[mask2] = y_u[mask2], y_l[mask2]
+	mask3 = ~torch.bitwise_or(mask1, mask2)
+	b_l[mask3], b_u[mask3] = get_const(-.5, ref=l[mask3]), torch.maximum(y_l[mask3], y_u[mask3])
+	return (w_l, b_l), (w_u, b_u)
 
 if __name__ == '__main__':
 	# test
