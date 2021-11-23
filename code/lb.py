@@ -42,8 +42,9 @@ def get_tanget(t):
 
 def get_scant(p, q):
 	m, n = spu_0(p), spu_0(q)
-	w = (n - m) / (q - p)
-	b = m - w * p
+	q_sub_p = q - p
+	w = (n - m) / q_sub_p
+	b = (m * q - n * p) / q_sub_p  # m - w * p
 	return w, b
 
 
@@ -84,7 +85,7 @@ def case_l0tu(l, u, t):
 	# case l < 0 <= t <= u
 	# L: tangent @ t
 	# U1: scant @ l, u
-	# U2: tangent @ l, never used for u >= -l
+	# U2: tangent @ l, never used for u >= -l (mask always false)
 	w_l = 2. * t
 	b_l = - t ** 2 - .5
 	s_l = torch.sigmoid(l)
