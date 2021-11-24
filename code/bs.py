@@ -5,7 +5,7 @@ def normalize(x):
 	return (x - .1307) / .3081
 
 
-def get_homogenous_weight(w, b):
+def get_homogeneous_weight(w, b):
 	# | w b |
 	# | 0 1 |
 	return torch.cat([torch.cat([w, torch.zeros((1, w.shape[-1]), dtype=torch.float64)], 0),
@@ -14,8 +14,8 @@ def get_homogenous_weight(w, b):
 
 def get_spu_weight(l, u, f):
 	(w_l, b_l), (w_u, b_u) = f(l.flatten()[:-1], u.flatten()[:-1])
-	W_l = get_homogenous_weight(torch.diag(w_l), b_l)
-	W_u = get_homogenous_weight(torch.diag(w_u), b_u)
+	W_l = get_homogeneous_weight(torch.diag(w_l), b_l)
+	W_u = get_homogeneous_weight(torch.diag(w_u), b_u)
 	return W_l, W_u
 
 
@@ -49,12 +49,12 @@ def back_substitution(weights_l, weights_u, is_affine_layers=None):
 def analyze_f(net, inputs, eps, true_label, f):
 	weights_affine = net.state_dict()
 	weights_affine = [weights_affine[k].double() for k in weights_affine]
-	weights_affine = [get_homogenous_weight(weights_affine[2 * i], weights_affine[2 * i + 1]) for i in
+	weights_affine = [get_homogeneous_weight(weights_affine[2 * i], weights_affine[2 * i + 1]) for i in
 	                  range(len(weights_affine) // 2)]
 
 	# eps after normalization?
 	inputs = normalize(inputs.flatten().double())
-	# homogenous coordinates (append 1)
+	# homogeneous coordinates (append 1)
 	l = torch.unsqueeze(torch.cat([inputs - eps, torch.ones(1, dtype=torch.float64)], 0), 1)
 	u = torch.unsqueeze(torch.cat([inputs + eps, torch.ones(1, dtype=torch.float64)], 0), 1)
 
@@ -101,8 +101,8 @@ if __name__ == '__main__':
 
 		wo = torch.tensor([[1., -1., 0.]], dtype=torch.float64)
 
-		w1 = get_homogenous_weight(w1, b1)
-		w2 = get_homogenous_weight(w2, b2)
+		w1 = get_homogeneous_weight(w1, b1)
+		w2 = get_homogeneous_weight(w2, b2)
 
 		l = torch.unsqueeze(
 			torch.cat([torch.tensor([0., 0.], dtype=torch.float64), torch.ones(1, dtype=torch.float64)], 0), 1)
@@ -155,9 +155,9 @@ if __name__ == '__main__':
 
 		wo = torch.tensor([[1., -1., 0]], dtype=torch.float64)
 
-		w1 = get_homogenous_weight(w1, b1)
-		w2 = get_homogenous_weight(w2, b2)
-		w3 = get_homogenous_weight(w3, b3)
+		w1 = get_homogeneous_weight(w1, b1)
+		w2 = get_homogeneous_weight(w2, b2)
+		w3 = get_homogeneous_weight(w3, b3)
 
 		l = torch.unsqueeze(
 			torch.cat([torch.tensor([-1., -1.], dtype=torch.float64), torch.ones(1, dtype=torch.float64)], 0), 1)
