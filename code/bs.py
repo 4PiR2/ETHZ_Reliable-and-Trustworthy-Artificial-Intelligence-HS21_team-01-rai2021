@@ -31,8 +31,8 @@ def back_substitution(weights_l, weights_u, is_affine_layers=None):
 	n_nodes = len(l)
 	for i in range(n_layers - 1)[::-1]:
 		if is_affine_layers is not None and is_affine_layers[i]:
-			l = l @ weights_l[i]
-			u = u @ weights_u[i]
+			l @= weights_l[i]
+			u @= weights_u[i]
 		else:
 			l_new = torch.zeros((n_nodes, weights_l[i].shape[-1]), dtype=torch.float64)
 			u_new = torch.zeros((n_nodes, weights_u[i].shape[-1]), dtype=torch.float64)
