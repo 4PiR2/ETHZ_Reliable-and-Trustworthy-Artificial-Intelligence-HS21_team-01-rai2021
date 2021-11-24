@@ -8,7 +8,7 @@ def normalize(x):
 def get_homogenous_weight(w, b):
 	# | w b |
 	# | 0 1 |
-	return torch.cat([torch.cat([w, torch.zeros((1, w.shape[1]), dtype=torch.float64)], 0),
+	return torch.cat([torch.cat([w, torch.zeros((1, w.shape[-1]), dtype=torch.float64)], 0),
 	                  torch.unsqueeze(torch.cat([b, torch.ones(1, dtype=torch.float64)], 0), 1)], 1)
 
 
@@ -16,56 +16,69 @@ def get_spu_weight(l, u, f):
 	(w_l, b_l), (w_u, b_u) = f(l.flatten()[:-1], u.flatten()[:-1])
 	W_l = get_homogenous_weight(torch.diag(w_l), b_l)
 	W_u = get_homogenous_weight(torch.diag(w_u), b_u)
-	return torch.stack([W_l, W_u])
+	return W_l, W_u
 
 
-def back_substitution(eq, dp_eqs, dp_l, dp_u):
-	n_layers = len(dp_eqs)
-	n_nodes = eq.shape[1]
-	dp_eqs.append(eq)
-	eq_l = eq[0]
-	eq_u = eq[1]
-	for i in range(n_layers)[::-1]:
-		eq_i = dp_eqs[i]
-		eq_l_new = torch.zeros((n_nodes, dp_eqs[i].shape[2]), dtype=torch.float64)
-		eq_u_new = torch.zeros((n_nodes, dp_eqs[i].shape[2]), dtype=torch.float64)
-		for j in range(n_nodes):
-			row = torch.unsqueeze(eq_l[j], 0)
-			eq_l_new[j] = row @ torch.where(row.T >= 0., eq_i[0], eq_i[1])
-			row = torch.unsqueeze(eq_u[j], 0)
-			eq_u_new[j] = row @ torch.where(row.T >= 0., eq_i[1], eq_i[0])
-		eq_l = eq_l_new
-		eq_u = eq_u_new
-	dp_l.append(eq_l)
-	dp_u.append(eq_u)
-	# assert torch.all(eq_l <= eq_u)
-	return
+def add_weights(weights_l, weights_u, is_affine_layers, *args):
+	weights_l.append(args[0])
+	weights_u.append(args[-1])
+	is_affine_layers.append(len(args) < 2)
+
+
+def back_substitution(weights_l, weights_u, is_affine_layers=None):
+	n_layers = len(weights_l)
+	l, u = weights_l[-1], weights_u[-1]
+	n_nodes = len(l)
+	for i in range(n_layers - 1)[::-1]:
+		if is_affine_layers is not None and is_affine_layers[i]:
+			l = l @ weights_l[i]
+			u = u @ weights_u[i]
+		else:
+			l_new = torch.zeros((n_nodes, weights_l[i].shape[-1]), dtype=torch.float64)
+			u_new = torch.zeros((n_nodes, weights_u[i].shape[-1]), dtype=torch.float64)
+			for j in range(n_nodes):
+				row = torch.unsqueeze(l[j], 0)
+				l_new[j] = row @ torch.where(row.T >= 0., weights_l[i], weights_u[i])
+				row = torch.unsqueeze(u[j], 0)
+				u_new[j] = row @ torch.where(row.T >= 0., weights_u[i], weights_l[i])
+			l, u = l_new, u_new
+	# assert torch.all(l <= u)
+	return l, u
 
 
 def analyze_f(net, inputs, eps, true_label, f):
-	params = net.state_dict()
-	params = [params[k].double() for k in params]
-	params = [get_homogenous_weight(params[2 * i], params[2 * i + 1]) for i in range(len(params) // 2)]
+	weights_affine = net.state_dict()
+	weights_affine = [weights_affine[k].double() for k in weights_affine]
+	weights_affine = [get_homogenous_weight(weights_affine[2 * i], weights_affine[2 * i + 1]) for i in
+	                  range(len(weights_affine) // 2)]
 
 	# eps after normalization?
 	inputs = normalize(inputs.flatten().double())
-	dp_l = [torch.unsqueeze(torch.cat([inputs - eps, torch.ones(1, dtype=torch.float64)], 0), 1)]
-	dp_u = [torch.unsqueeze(torch.cat([inputs + eps, torch.ones(1, dtype=torch.float64)], 0), 1)]
-	dp_eqs = [torch.stack([dp_l[-1], dp_u[-1]])]
+	# homogenous coordinates (append 1)
+	l = torch.unsqueeze(torch.cat([inputs - eps, torch.ones(1, dtype=torch.float64)], 0), 1)
+	u = torch.unsqueeze(torch.cat([inputs + eps, torch.ones(1, dtype=torch.float64)], 0), 1)
 
-	for i in range(len(params)):
-		back_substitution(torch.stack([params[i]] * 2), dp_eqs, dp_l, dp_u)
-		if i < len(params) - 1:
-			back_substitution(get_spu_weight(dp_l[-1], dp_u[-1], f), dp_eqs, dp_l, dp_u)
+	weights_l = []
+	weights_u = []
+	is_affine_layers = []
+	add_weights(weights_l, weights_u, is_affine_layers, l, u)
 
-	weight_out = torch.eye(11, dtype=torch.float64)
-	weight_out = torch.cat([weight_out[:true_label], weight_out[true_label + 1:-1]], 0)
-	weight_out[:, true_label] -= 1.
-	back_substitution(torch.stack([weight_out] * 2), dp_eqs, dp_l, dp_u)
+	for i in range(len(weights_affine)):
+		add_weights(weights_l, weights_u, is_affine_layers, weights_affine[i])
+		if i < len(weights_affine) - 1:
+			l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+			w_l, w_u = get_spu_weight(l, u, f)
+			add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
+
+	w_out = torch.eye(11, dtype=torch.float64)
+	w_out = torch.cat([w_out[:true_label], w_out[true_label + 1:-1]], 0)
+	w_out[:, true_label] -= 1.
+	add_weights(weights_l, weights_u, is_affine_layers, w_out)
+	l, u = back_substitution(weights_l, weights_u, is_affine_layers)
 
 	# testcase 12: potential bug or numerical (rounding) problem?
 	margin = 1e-1
-	result = torch.all(dp_u[-1] < -margin)
+	result = torch.all(u < -margin)
 	return result
 
 
@@ -86,24 +99,32 @@ if __name__ == '__main__':
 		                   [-1., 1.]], dtype=torch.float64)
 		b2 = torch.tensor([0., 0.], dtype=torch.float64)
 
-		weight_out = torch.tensor([[1., -1., 0.]], dtype=torch.float64)
+		wo = torch.tensor([[1., -1., 0.]], dtype=torch.float64)
 
-		eq1 = torch.stack([get_homogenous_weight(w1, b1)] * 2)
-		eq2 = torch.stack([get_homogenous_weight(w2, b2)] * 2)
-		eqo = torch.stack([weight_out] * 2)
+		w1 = get_homogenous_weight(w1, b1)
+		w2 = get_homogenous_weight(w2, b2)
 
-		dp_l = [torch.unsqueeze(
-			torch.cat([torch.tensor([0., 0.], dtype=torch.float64), torch.ones(1, dtype=torch.float64)], 0), 1)]
-		dp_u = [torch.unsqueeze(
-			torch.cat([torch.tensor([1., 1.], dtype=torch.float64), torch.ones(1, dtype=torch.float64)], 0), 1)]
-		dp_eqs = [torch.stack([dp_l[-1], dp_u[-1]])]
+		l = torch.unsqueeze(
+			torch.cat([torch.tensor([0., 0.], dtype=torch.float64), torch.ones(1, dtype=torch.float64)], 0), 1)
+		u = torch.unsqueeze(
+			torch.cat([torch.tensor([1., 1.], dtype=torch.float64), torch.ones(1, dtype=torch.float64)], 0), 1)
 
-		back_substitution(eq1, dp_eqs, dp_l, dp_u)
-		back_substitution(get_spu_weight(dp_l[-1], dp_u[-1], compute_linear_bounds_test), dp_eqs, dp_l, dp_u)
-		back_substitution(eq2, dp_eqs, dp_l, dp_u)
-		back_substitution(eqo, dp_eqs, dp_l, dp_u)
+		weights_l = []
+		weights_u = []
+		is_affine_layers = []
+		add_weights(weights_l, weights_u, is_affine_layers, l, u)
 
-		result = torch.all(dp_u[-1] > 0.)
+		add_weights(weights_l, weights_u, is_affine_layers, w1)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		w_l, w_u = get_spu_weight(l, u, compute_linear_bounds_test)
+		add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		add_weights(weights_l, weights_u, is_affine_layers, w2)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		add_weights(weights_l, weights_u, is_affine_layers, wo)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+
+		result = torch.all(l >= 0.)
 		return result
 
 
@@ -132,30 +153,40 @@ if __name__ == '__main__':
 		                   [0., 1.]], dtype=torch.float64)
 		b3 = torch.tensor([3., 0.], dtype=torch.float64)
 
-		weight_out = torch.tensor([[1., -1., 0]], dtype=torch.float64)
+		wo = torch.tensor([[1., -1., 0]], dtype=torch.float64)
 
-		eq1 = torch.stack([get_homogenous_weight(w1, b1)] * 2)
-		eq2 = torch.stack([get_homogenous_weight(w2, b2)] * 2)
-		eq3 = torch.stack([get_homogenous_weight(w3, b3)] * 2)
-		eqo = torch.stack([weight_out] * 2)
+		w1 = get_homogenous_weight(w1, b1)
+		w2 = get_homogenous_weight(w2, b2)
+		w3 = get_homogenous_weight(w3, b3)
 
-		dp_l = [torch.unsqueeze(
-			torch.cat([torch.tensor([-1., -1.], dtype=torch.float64), torch.ones(1, dtype=torch.float64)], 0), 1)]
-		dp_u = [torch.unsqueeze(
-			torch.cat([torch.tensor([1., 1.], dtype=torch.float64), torch.ones(1, dtype=torch.float64)], 0), 1)]
-		dp_eqs = [torch.stack([dp_l[-1], dp_u[-1]])]
+		l = torch.unsqueeze(
+			torch.cat([torch.tensor([-1., -1.], dtype=torch.float64), torch.ones(1, dtype=torch.float64)], 0), 1)
+		u = torch.unsqueeze(
+			torch.cat([torch.tensor([1., 1.], dtype=torch.float64), torch.ones(1, dtype=torch.float64)], 0), 1)
 
-		back_substitution(eq1, dp_eqs, dp_l, dp_u)
-		back_substitution(get_spu_weight(dp_l[-1], dp_u[-1], compute_linear_bounds_test1), dp_eqs, dp_l, dp_u)
-		back_substitution(eq2, dp_eqs, dp_l, dp_u)
-		back_substitution(get_spu_weight(dp_l[-1], dp_u[-1], compute_linear_bounds_test2), dp_eqs, dp_l, dp_u)
-		back_substitution(eq3, dp_eqs, dp_l, dp_u)
-		back_substitution(eqo, dp_eqs, dp_l, dp_u)
+		weights_l = []
+		weights_u = []
+		is_affine_layers = []
+		add_weights(weights_l, weights_u, is_affine_layers, l, u)
 
-		result = torch.all(dp_u[-1] > 0.)
+		add_weights(weights_l, weights_u, is_affine_layers, w1)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		w_l, w_u = get_spu_weight(l, u, compute_linear_bounds_test1)
+		add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		add_weights(weights_l, weights_u, is_affine_layers, w2)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		w_l, w_u = get_spu_weight(l, u, compute_linear_bounds_test2)
+		add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		add_weights(weights_l, weights_u, is_affine_layers, w3)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		add_weights(weights_l, weights_u, is_affine_layers, wo)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+
+		result = torch.all(l > 0.)
 		return result
 
 
 	print(test_hw6())
 	print(test_lec6())
-	pass
