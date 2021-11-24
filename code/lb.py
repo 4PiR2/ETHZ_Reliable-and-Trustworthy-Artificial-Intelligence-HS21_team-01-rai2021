@@ -1,7 +1,7 @@
 import torch
 
 
-def get_const(x, shape=1, device='cpu', ref=None):
+def get_const_tensor(x, shape=1, device='cpu', ref=None):
 	# get a tensor of constant numbers
 	if ref is not None:
 		shape = ref.shape
@@ -14,7 +14,7 @@ def get_const(x, shape=1, device='cpu', ref=None):
 
 def spu_0(x):
 	# spu function (optimized)
-	y = get_const(0., ref=x)
+	y = get_const_tensor(0., ref=x)
 	mask = x >= 0.
 	y[mask] = x[mask] ** 2 - .5
 	mask = ~mask
@@ -25,7 +25,7 @@ def spu_0(x):
 def spu_1(x):
 	# 1-order derivative
 	# spu'(0) := 0
-	y = get_const(0., ref=x)
+	y = get_const_tensor(0., ref=x)
 	mask = x >= 0.
 	y[mask] = 2. * x[mask]
 	mask = ~mask
@@ -34,13 +34,13 @@ def spu_1(x):
 	return y
 
 
-def get_tanget(t):
+def get_tanget_line(t):
 	w = spu_1(t)
 	b = spu_0(t) - w * t
 	return w, b
 
 
-def get_scant(p, q):
+def get_scant_line(p, q):
 	m, n = spu_0(p), spu_0(q)
 	q_sub_p = q - p
 	w = (n - m) / q_sub_p
@@ -94,7 +94,7 @@ def case_l0tu(l, u, t):
 	w_u = (y_u + s_l) / u_sub_l
 	w_u_2 = s_l * (s_l - 1.)
 	mask = w_u >= w_u_2
-	b_u = get_const(0., ref=l)
+	b_u = get_const_tensor(0., ref=l)
 	b_u[mask] = - (l[mask] * y_u[mask] + u[mask] * s_l[mask]) / u_sub_l[mask]
 	mask = ~mask
 	w_u[mask] = w_u_2[mask]
@@ -112,7 +112,7 @@ def case_lt0u(l, u, t):
 	# u++ ==> U1 -> U4 -> U3 -> U2
 	s_l = torch.sigmoid(l)
 	w_l = (.5 - s_l) / l
-	b_l = get_const(-.5, ref=l)
+	b_l = get_const_tensor(-.5, ref=l)
 	s_t = torch.sigmoid(t)
 	w_u = s_t * (s_t - 1.)
 	b_u = - w_u * t - s_t
@@ -124,7 +124,7 @@ def case_lt0u(l, u, t):
 	w_u_3 = s_l[mask1] * (s_l[mask1] - 1.)
 	# compare slope
 	mask2 = w_u_2 >= w_u_3
-	b_u_2 = get_const(0., ref=w_u_2)
+	b_u_2 = get_const_tensor(0., ref=w_u_2)
 	b_u_2[mask2] = - (l[mask1][mask2] * y_u[mask2] + u[mask1][mask2] * s_l[mask1][mask2]) / u_sub_l[mask2]
 	mask2 = ~mask2
 	w_u_2[mask2] = w_u_3[mask2]
@@ -138,10 +138,10 @@ def case_l0u(l, u, t=None):
 	# case l < 0 < u
 	if t is None:
 		t = (l + u) * .5
-	w_l = get_const(0., ref=l)
-	b_l = get_const(0., ref=l)
-	w_u = get_const(0., ref=l)
-	b_u = get_const(0., ref=l)
+	w_l = get_const_tensor(0., ref=l)
+	b_l = get_const_tensor(0., ref=l)
+	w_u = get_const_tensor(0., ref=l)
+	b_u = get_const_tensor(0., ref=l)
 	mask = t >= 0.
 	w_l[mask], b_l[mask], w_u[mask], b_u[mask] = case_l0tu(l[mask], u[mask], t[mask])
 	mask = ~mask
@@ -153,10 +153,10 @@ def compute_linear_bounds(l, u):
 	# minimum area
 	# input: n-dim vector l, u (float64 tensor)
 	# output: n-dim vector w_l, b_l, w_u, b_u (float64 tensor)
-	w_l = get_const(0., ref=l)
-	b_l = get_const(0., ref=l)
-	w_u = get_const(0., ref=l)
-	b_u = get_const(0., ref=l)
+	w_l = get_const_tensor(0., ref=l)
+	b_l = get_const_tensor(0., ref=l)
+	w_u = get_const_tensor(0., ref=l)
+	b_u = get_const_tensor(0., ref=l)
 	mask1 = l >= 0.
 	w_l[mask1], b_l[mask1], w_u[mask1], b_u[mask1] = case_0ltu(l[mask1], u[mask1])
 	mask2 = u <= 0.
@@ -170,16 +170,16 @@ def compute_linear_bounds_boxlike(l, u):
 	# optimal box-comparable
 	# input: n-dim vector l, u (float64 tensor)
 	# output: n-dim vector w_l, b_l, w_u, b_u (float64 tensor)
-	w_l = get_const(0., ref=l)
-	b_l = get_const(0., ref=l)
-	w_u = get_const(0., ref=l)
-	b_u = get_const(0., ref=l)
+	w_l = get_const_tensor(0., ref=l)
+	b_l = get_const_tensor(0., ref=l)
+	w_u = get_const_tensor(0., ref=l)
+	b_u = get_const_tensor(0., ref=l)
 	mask1 = l >= 0.
 	w_l[mask1], b_l[mask1], w_u[mask1], b_u[mask1] = case_0ltu(l[mask1], u[mask1], t=l[mask1])
 	mask2 = u <= 0.
 	w_l[mask2], b_l[mask2], w_u[mask2], b_u[mask2] = case_ltu0(l[mask2], u[mask2], t=l[mask2])
 	mask3 = ~torch.bitwise_or(mask1, mask2)
-	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3], t=get_const(0., ref=l[mask3]))
+	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3], t=get_const_tensor(0., ref=l[mask3]))
 	return (w_l, b_l), (w_u, b_u)
 
 
@@ -187,17 +187,17 @@ def compute_linear_bounds_box(l, u):
 	# box, not recommended
 	# input: n-dim vector l, u (float64 tensor)
 	# output: n-dim vector w_l, b_l, w_u, b_u (float64 tensor)
-	w_l = get_const(0., ref=l)
+	w_l = get_const_tensor(0., ref=l)
 	w_u = w_l
 	y_l, y_u = spu_0(l), spu_0(u)
-	b_l = get_const(0., ref=l)
-	b_u = get_const(0., ref=l)
+	b_l = get_const_tensor(0., ref=l)
+	b_u = get_const_tensor(0., ref=l)
 	mask1 = l >= 0.
 	b_l[mask1], b_u[mask1] = y_l[mask1], y_u[mask1]
 	mask2 = u <= 0.
 	b_l[mask2], b_u[mask2] = y_u[mask2], y_l[mask2]
 	mask3 = ~torch.bitwise_or(mask1, mask2)
-	b_l[mask3], b_u[mask3] = get_const(-.5, ref=l[mask3]), torch.maximum(y_l[mask3], y_u[mask3])
+	b_l[mask3], b_u[mask3] = get_const_tensor(-.5, ref=l[mask3]), torch.maximum(y_l[mask3], y_u[mask3])
 	return (w_l, b_l), (w_u, b_u)
 
 

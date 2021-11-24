@@ -2,7 +2,7 @@ import argparse
 import torch
 from networks import FullyConnected
 
-from lb import compute_linear_bounds, compute_linear_bounds_boxlike
+from lb import compute_linear_bounds, compute_linear_bounds_boxlike, compute_linear_bounds_box
 from bs import analyze_f
 
 DEVICE = 'cpu'

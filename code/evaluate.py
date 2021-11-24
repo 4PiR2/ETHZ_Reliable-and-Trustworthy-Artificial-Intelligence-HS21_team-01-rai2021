@@ -5,7 +5,7 @@ from verifier import main
 
 argv_backup = sys.argv
 
-# testcase 12
+print('testcase 12')
 k = '1'
 net = 'fc3'
 spec = 'example_img1_0.00230.txt'
