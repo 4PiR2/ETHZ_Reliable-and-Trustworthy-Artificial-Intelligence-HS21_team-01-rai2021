@@ -2,12 +2,18 @@ import argparse
 import torch
 from networks import FullyConnected
 
+from lb import compute_linear_bounds, compute_linear_bounds_boxlike
+from bs import analyze_f
+
 DEVICE = 'cpu'
 INPUT_SIZE = 28
 
 
 def analyze(net, inputs, eps, true_label):
-    return 0
+    for f in [compute_linear_bounds, compute_linear_bounds_boxlike]:
+        if analyze_f(net, inputs, eps, true_label, f):
+            return True
+    return False
 
 
 def main():
