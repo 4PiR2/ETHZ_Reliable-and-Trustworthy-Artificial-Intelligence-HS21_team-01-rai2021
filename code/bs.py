@@ -12,7 +12,7 @@ def get_homogeneous_weight(w, b):
 	                  torch.unsqueeze(torch.cat([b, torch.ones(1, dtype=torch.float64)], 0), 1)], 1)
 
 
-def get_spu_weight(l, u, f):
+def get_spu_weights(l, u, f):
 	(w_l, b_l), (w_u, b_u) = f(l.flatten()[:-1], u.flatten()[:-1])
 	W_l = get_homogeneous_weight(torch.diag(w_l), b_l)
 	W_u = get_homogeneous_weight(torch.diag(w_u), b_u)
@@ -67,7 +67,7 @@ def analyze_f(net, inputs, eps, true_label, f):
 		add_weights(weights_l, weights_u, is_affine_layers, weights_affine[i])
 		if i < len(weights_affine) - 1:
 			l, u = back_substitution(weights_l, weights_u, is_affine_layers)
-			w_l, w_u = get_spu_weight(l, u, f)
+			w_l, w_u = get_spu_weights(l, u, f)
 			add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
 
 	w_out = torch.eye(11, dtype=torch.float64)
@@ -116,7 +116,7 @@ if __name__ == '__main__':
 
 		add_weights(weights_l, weights_u, is_affine_layers, w1)
 		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
-		w_l, w_u = get_spu_weight(l, u, compute_linear_bounds_test)
+		w_l, w_u = get_spu_weights(l, u, compute_linear_bounds_test)
 		add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
 		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
 		add_weights(weights_l, weights_u, is_affine_layers, w2)
@@ -171,12 +171,12 @@ if __name__ == '__main__':
 
 		add_weights(weights_l, weights_u, is_affine_layers, w1)
 		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
-		w_l, w_u = get_spu_weight(l, u, compute_linear_bounds_test1)
+		w_l, w_u = get_spu_weights(l, u, compute_linear_bounds_test1)
 		add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
 		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
 		add_weights(weights_l, weights_u, is_affine_layers, w2)
 		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
-		w_l, w_u = get_spu_weight(l, u, compute_linear_bounds_test2)
+		w_l, w_u = get_spu_weights(l, u, compute_linear_bounds_test2)
 		add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
 		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
 		add_weights(weights_l, weights_u, is_affine_layers, w3)
@@ -188,5 +188,5 @@ if __name__ == '__main__':
 		return result
 
 
-	print(test_hw6())
-	print(test_lec6())
+	assert test_hw6()
+	assert test_lec6()
