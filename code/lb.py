@@ -1,19 +1,14 @@
 import torch
 
 
-def get_const_tensor(x, shape=1, ref=None):
+def get_const_tensor(x, shape=1):
 	# get a tensor of constant numbers
-	if ref is not None:
-		shape = ref.shape
-	if x == 0.:
-		return torch.zeros(shape, dtype=torch.float64)
-	else:
-		return x * torch.ones(shape, dtype=torch.float64)
+	return x * torch.ones(shape, dtype=torch.float64)
 
 
 def spu_0(x):
 	# spu function (optimized)
-	y = get_const_tensor(0., ref=x)
+	y = get_const_tensor(0., x.shape)
 	mask = x >= 0.
 	y[mask] = x[mask] ** 2 - .5
 	mask = ~mask
@@ -24,7 +19,7 @@ def spu_0(x):
 def spu_1(x):
 	# 1-order derivative
 	# spu'(0) := 0
-	y = get_const_tensor(0., ref=x)
+	y = get_const_tensor(0., x.shape)
 	mask = x >= 0.
 	y[mask] = 2. * x[mask]
 	mask = ~mask
@@ -44,148 +39,57 @@ def get_scant_line(p, q):
 	q_sub_p = q - p
 	w = (n - m) / q_sub_p
 	b = (m * q - n * p) / q_sub_p  # m - w * p
+	mask = p == q
+	w[mask], b[mask] = get_tanget_line(p[mask])
 	return w, b
-
-
-def case_0lu(l, u, t_l=None):
-	# case 0 <= l <= u
-	# L: tangent @ t
-	# U: scant @ l, u
-	w_u = l + u
-	b_u = - l * u - .5
-	if t_l is None:
-		# t = (l + u) * .5
-		w_l = w_u
-		b_l = -.25 * w_u ** 2 - .5
-	else:
-		w_l = 2. * t_l
-		b_l = - t_l ** 2 - .5
-	return w_l, b_l, w_u, b_u
-
-
-def case_lu0(l, u, t_u=None):
-	# case l <= u <= 0
-	# L: scant @ l, u
-	# U: tangent @ t
-	s_l = torch.sigmoid(l)
-	s_u = torch.sigmoid(u)
-	u_sub_l = u - l
-	w_l = (s_l - s_u) / u_sub_l
-	b_l = (l * s_u - u * s_l) / u_sub_l
-	if t_u is None:
-		t_u = (l + u) * .5
-	s_t = torch.sigmoid(t_u)
-	w_u = s_t * (s_t - 1.)
-	b_u = - w_u * t_u - s_t
-	return w_l, b_l, w_u, b_u
-
-
-def case_l0u_l(l, t_l):
-	# case l < 0 < u
-	# L1: tangent @ t (t >= 0)
-	# L2: scant @ l, 0 (t < 0)
-	w_l = get_const_tensor(0., ref=l)
-	b_l = get_const_tensor(0., ref=l)
-	mask = t_l >= 0.
-	w_l[mask] = 2. * t_l[mask]
-	b_l[mask] = - t_l[mask] ** 2 - .5
-	mask = ~mask
-	s_l = torch.sigmoid(l[mask])
-	w_l[mask] = (.5 - s_l) / l[mask]
-	b_l[mask] = get_const_tensor(-.5, ref=s_l)
-	return w_l, b_l
-
-
-def case_l0u_u(l, u, t_u):
-	# case l <= t < 0 < u
-	# U1: tangent @ t
-	# U2: scant @ l, u
-	# U3: tangent @ l (never used for u >= -l (mask always false))
-	# U4: tangent @ a (solve s(a)(s(a) - 1.) = (u ** 2 - .5 + s(a)) / (u - a), not implemented)
-	# u++ ==> U1 -> U4 -> U3 -> U2
-	s_t = torch.sigmoid(t_u)
-	w_u = s_t * (s_t - 1.)
-	b_u = - w_u * t_u - s_t
-	# test @ u
-	mask1 = u ** 2 - .5 > w_u * u + b_u
-	y_u = u[mask1] ** 2 - .5
-	s_l = torch.sigmoid(l[mask1])
-	u_sub_l = u[mask1] - l[mask1]
-	w_u_2 = (y_u + s_l) / u_sub_l
-	w_u_3 = s_l * (s_l - 1.)
-	# compare slope
-	mask2 = w_u_2 >= w_u_3
-	b_u_2 = get_const_tensor(0., ref=w_u_2)
-	b_u_2[mask2] = - (l[mask1][mask2] * y_u[mask2] + u[mask1][mask2] * s_l[mask2]) / u_sub_l[mask2]
-	mask2 = ~mask2
-	w_u_2[mask2] = w_u_3[mask2]
-	b_u_2[mask2] = - w_u_3[mask2] * l[mask1][mask2] - s_l[mask2]
-	w_u[mask1] = w_u_2
-	b_u[mask1] = b_u_2
-	return w_u, b_u
-
-
-def case_l0u(l, u, t_l=None, t_u=None):
-	# case l < 0 < u
-	if t_l is None:
-		t_l = (l + u) * .5
-	if t_u is None:
-		t_u = (l + u) * .5
-	w_l, b_l = case_l0u_l(l, t_l)
-	w_u, b_u = case_l0u_u(l, u, t_u)
-	return w_l, b_l, w_u, b_u
-
-
-def case_lu(l):
-	# case l = u
-	w = get_const_tensor(0., ref=l)
-	b = spu_0(l)
-	return w, b, w, b
 
 
 def compute_linear_bounds(l, u, t_l=.5, t_u=.5):
 	# minimum area
 	# input: n-dim vector l, u (float64 tensor)
 	# output: n-dim vector w_l, b_l, w_u, b_u (float64 tensor)
-	w_l = get_const_tensor(0., ref=l)
-	b_l = get_const_tensor(0., ref=l)
-	w_u = get_const_tensor(0., ref=l)
-	b_u = get_const_tensor(0., ref=l)
 	if type(t_l) is float:
 		t_l = (1. - t_l) * l + t_l * u
 	if type(t_u) is float:
 		t_u = (1. - t_u) * l + t_u * u
-	mask1 = l >= 0.
-	w_l[mask1], b_l[mask1], w_u[mask1], b_u[mask1] = case_0lu(l[mask1], u[mask1], t_l[mask1])
-	mask2 = u <= 0.
-	w_l[mask2], b_l[mask2], w_u[mask2], b_u[mask2] = case_lu0(l[mask2], u[mask2], t_u[mask2])
-	mask3 = ~torch.bitwise_or(mask1, mask2)
-	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3], t_l[mask3], t_u[mask3])
-	mask4 = l == u
-	w_l[mask4], b_l[mask4], w_u[mask4], b_u[mask4] = case_lu(l[mask4])
+	# L1: scant @ l, min(0, u) (t <= 0)
+	# L2: tangent @ t (t >= 0)
+	w_l, b_l = get_tanget_line(t_l)
+	# test @ 0
+	mask = b_l > -.5
+	w_l[mask], b_l[mask] = get_scant_line(l[mask], torch.minimum(get_const_tensor(0., len(l[mask])), u[mask]))
+	# U1: tangent @ t
+	# U2: tangent @ a (solve s(a)(s(a) - 1.) = (u ** 2 - .5 + s(a)) / (u - a), not implemented)
+	# U3: tangent @ l (never used for u >= -l (mask always false))
+	# U4: scant @ l, u
+	w_u, b_u = get_tanget_line(t_u)
+	# test @ u
+	mask = torch.bitwise_or(w_u * u + b_u < spu_0(u), t_u >= 0.)
+	w_u[mask], b_u[mask] = get_tanget_line(l[mask])
+	# test @ u
+	mask = w_u * u + b_u < spu_0(u)
+	w_u[mask], b_u[mask] = get_scant_line(l[mask], u[mask])
 	return (w_l, b_l), (w_u, b_u)
 
 
 def compute_linear_bounds_boxlike(l, u):
 	# optimal box-comparable
-	return compute_linear_bounds(l, u, torch.maximum(get_const_tensor(0., ref=l), l), l)
+	return compute_linear_bounds(l, u, torch.minimum(torch.maximum(get_const_tensor(0., len(l)), l), u), l)
 
 
 def compute_linear_bounds_box(l, u):
 	# box, not recommended
-	# input: n-dim vector l, u (float64 tensor)
-	# output: n-dim vector w_l, b_l, w_u, b_u (float64 tensor)
-	w_l = get_const_tensor(0., ref=l)
+	w_l = get_const_tensor(0., len(l))
 	w_u = w_l
 	y_l, y_u = spu_0(l), spu_0(u)
-	b_l = get_const_tensor(0., ref=l)
-	b_u = get_const_tensor(0., ref=l)
+	b_l = get_const_tensor(0., len(l))
+	b_u = get_const_tensor(0., len(l))
 	mask1 = l >= 0.
 	b_l[mask1], b_u[mask1] = y_l[mask1], y_u[mask1]
 	mask2 = u <= 0.
 	b_l[mask2], b_u[mask2] = y_u[mask2], y_l[mask2]
 	mask3 = ~torch.bitwise_or(mask1, mask2)
-	b_l[mask3], b_u[mask3] = get_const_tensor(-.5, ref=l[mask3]), torch.maximum(y_l[mask3], y_u[mask3])
+	b_l[mask3], b_u[mask3] = get_const_tensor(-.5, len(l[mask3])), torch.maximum(y_l[mask3], y_u[mask3])
 	return (w_l, b_l), (w_u, b_u)
 
 
@@ -197,7 +101,7 @@ if __name__ == '__main__':
 
 	l, u = torch.randn(n, dtype=torch.float64), torch.randn(n, dtype=torch.float64)
 	l, u = torch.minimum(l, u), torch.maximum(l, u)
-	(w_l, b_l), (w_u, b_u) = compute_linear_bounds(l, u, .5, .5)
+	(w_l, b_l), (w_u, b_u) = compute_linear_bounds_boxlike(l, u)
 	x = torch.stack([torch.linspace(li, ui, 10000, dtype=torch.float64) for li, ui in zip(l, u)], dim=1)
 	y = spu_0(x)
 	diff_l = w_l * x + b_l - y
