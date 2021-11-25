@@ -10,8 +10,12 @@ INPUT_SIZE = 28
 
 
 def analyze(net, inputs, eps, true_label):
+    weights_affine = net.state_dict()
+    weights_affine = [weights_affine[k].double() for k in weights_affine]
+    l = net.layers[:2](inputs - eps).T.double()
+    u = net.layers[:2](inputs + eps).T.double()
     for f in [compute_linear_bounds, compute_linear_bounds_boxlike]:
-        if analyze_f(net, inputs, eps, true_label, f):
+        if analyze_f(weights_affine, l, u, 10, true_label, f):
             return True
     return False
 
@@ -51,7 +55,10 @@ def main():
     pred_label = outs.max(dim=1)[1].item()
     assert pred_label == true_label
 
-    if analyze(net, inputs, eps, true_label):
+    result = analyze(net, inputs, eps, true_label)
+    if __name__ != '__main__':
+        return result
+    if result:
         print('verified')
     else:
         print('not verified')

@@ -149,7 +149,14 @@ def case_l0u(l, u, t=None):
 	return w_l, b_l, w_u, b_u
 
 
-def compute_linear_bounds(l, u):
+def case_lu(l, u=None, t=None):
+	# case l = u
+	w = get_const_tensor(0., ref=l)
+	b = spu_0(l)
+	return w, b, w, b
+
+
+def compute_linear_bounds(l, u, r=.5):
 	# minimum area
 	# input: n-dim vector l, u (float64 tensor)
 	# output: n-dim vector w_l, b_l, w_u, b_u (float64 tensor)
@@ -157,12 +164,15 @@ def compute_linear_bounds(l, u):
 	b_l = get_const_tensor(0., ref=l)
 	w_u = get_const_tensor(0., ref=l)
 	b_u = get_const_tensor(0., ref=l)
+	t = (1. - r) * l + r * u
 	mask1 = l >= 0.
-	w_l[mask1], b_l[mask1], w_u[mask1], b_u[mask1] = case_0ltu(l[mask1], u[mask1])
+	w_l[mask1], b_l[mask1], w_u[mask1], b_u[mask1] = case_0ltu(l[mask1], u[mask1], t[mask1])
 	mask2 = u <= 0.
-	w_l[mask2], b_l[mask2], w_u[mask2], b_u[mask2] = case_ltu0(l[mask2], u[mask2])
+	w_l[mask2], b_l[mask2], w_u[mask2], b_u[mask2] = case_ltu0(l[mask2], u[mask2], t[mask2])
 	mask3 = ~torch.bitwise_or(mask1, mask2)
-	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3])
+	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3], t[mask3])
+	mask = l == u
+	w_l[mask], b_l[mask], w_u[mask], b_u[mask] = case_lu(l[mask])
 	return (w_l, b_l), (w_u, b_u)
 
 
@@ -180,6 +190,8 @@ def compute_linear_bounds_boxlike(l, u):
 	w_l[mask2], b_l[mask2], w_u[mask2], b_u[mask2] = case_ltu0(l[mask2], u[mask2], t=l[mask2])
 	mask3 = ~torch.bitwise_or(mask1, mask2)
 	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3], t=get_const_tensor(0., ref=l[mask3]))
+	mask = l == u
+	w_l[mask], b_l[mask], w_u[mask], b_u[mask] = case_lu(l[mask])
 	return (w_l, b_l), (w_u, b_u)
 
 
