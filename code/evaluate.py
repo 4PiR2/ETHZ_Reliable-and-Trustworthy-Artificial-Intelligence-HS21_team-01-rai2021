@@ -5,12 +5,12 @@ from verifier import main
 
 argv_backup = sys.argv
 
-# print('testcase 12')
-# k = '1'
-# net = 'fc3'
-# spec = 'example_img1_0.00230.txt'
-# sys.argv = argv_backup + ['--net', 'net' + k + '_' + net, '--spec', '../test_cases/net' + k + '_' + net + '/' + spec]
-# main()
+print('testcase 1')
+k = '0'
+net = 'fc1'
+spec = 'example_img0_0.01800.txt'
+sys.argv = argv_backup + ['--net', 'net' + k + '_' + net, '--spec', '../test_cases/net' + k + '_' + net + '/' + spec]
+result = main()
 
 gts = {}
 with open('../test_cases/gt.txt', 'r') as f:
@@ -30,7 +30,7 @@ for net in ['fc1', 'fc2', 'fc3', 'fc4', 'fc5']:
 			result = 'verified' if main() else 'not verified'
 			if result != gt:
 				print(name)
-				print(gt, '(gt)', '--', result)
+				print(gt, '(gt)', '--', result, '(out)')
 			if result == 'verified':
 				if gt == 'verified':
 					score += 1

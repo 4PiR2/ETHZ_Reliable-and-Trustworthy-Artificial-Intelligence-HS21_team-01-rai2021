@@ -161,8 +161,8 @@ def compute_linear_bounds(l, u, t_l=.5, t_u=.5):
 	w_l[mask2], b_l[mask2], w_u[mask2], b_u[mask2] = case_lu0(l[mask2], u[mask2], t_u[mask2])
 	mask3 = ~torch.bitwise_or(mask1, mask2)
 	w_l[mask3], b_l[mask3], w_u[mask3], b_u[mask3] = case_l0u(l[mask3], u[mask3], t_l[mask3], t_u[mask3])
-	mask = l == u
-	w_l[mask], b_l[mask], w_u[mask], b_u[mask] = case_lu(l[mask])
+	mask4 = l == u
+	w_l[mask4], b_l[mask4], w_u[mask4], b_u[mask4] = case_lu(l[mask4])
 	return (w_l, b_l), (w_u, b_u)
 
 
@@ -216,6 +216,6 @@ if __name__ == '__main__':
 			plt.plot(x[:, i], w_u[i] * x[:, i] + b_u[i], c='r')
 			plt.grid()
 			plt.title(str(i))
-			plt.savefig('../tmp/' + str(i) + '.jpg')
+			plt.savefig('../tmp/lb_plots/' + str(i) + '.jpg')
 			# plt.show()
 			plt.clf()

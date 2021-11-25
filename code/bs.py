@@ -10,6 +10,12 @@ def get_homogeneous_weight(w, b):
 
 def get_spu_weights(l, u, f):
 	(w_l, b_l), (w_u, b_u) = f(l.flatten()[:-1], u.flatten()[:-1])
+	if False:  # debug
+		with open('../tmp/bs_spu_log/1.txt', 'w') as file:
+			for i in range(len(w_l)):
+				line = '\t'.join([str(float(x)) for x in [l[i], u[i], w_l[i], b_l[i], w_u[i], b_u[i]]]) + '\n'
+				file.write(line)
+		exit()
 	W_l = get_homogeneous_weight(torch.diag(w_l), b_l)
 	W_u = get_homogeneous_weight(torch.diag(w_u), b_u)
 	return W_l, W_u
@@ -27,7 +33,7 @@ def back_substitution(weights_l, weights_u, is_affine_layers=None):
 	for i in range(len(weights_l) - 1)[::-1]:
 		if is_affine_layers is not None and is_affine_layers[i]:
 			l @= weights_l[i]
-			u @= weights_u[i]
+			u @= weights_l[i]
 		else:
 			l_new = torch.zeros((n_nodes, weights_l[i].shape[-1]), dtype=torch.float64)
 			u_new = torch.zeros((n_nodes, weights_u[i].shape[-1]), dtype=torch.float64)
@@ -41,7 +47,7 @@ def back_substitution(weights_l, weights_u, is_affine_layers=None):
 	return l, u
 
 
-def analyze_f(weights_affine, l, u, n_out, true_label, f, margin=0.):
+def analyze_f(weights_affine, l, u, true_label, f, margin=0.):
 	weights_affine = [get_homogeneous_weight(weights_affine[2 * i], weights_affine[2 * i + 1]) for i in
 	                  range(len(weights_affine) // 2)]
 	# homogeneous coordinates (append 1)
@@ -62,7 +68,7 @@ def analyze_f(weights_affine, l, u, n_out, true_label, f, margin=0.):
 			add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
 
 	# l, u = back_substitution(weights_l, weights_u, is_affine_layers)  # debug
-	w_out = torch.eye(n_out + 1, dtype=torch.float64)
+	w_out = torch.eye(len(weights_affine[-1]), dtype=torch.float64)
 	w_out = torch.cat([w_out[:true_label], w_out[true_label + 1:-1]], 0)
 	w_out[:, true_label] -= 1.
 	add_weights(weights_l, weights_u, is_affine_layers, w_out)
@@ -90,7 +96,7 @@ if __name__ == '__main__':
 		b2 = torch.tensor([0., 0.], dtype=torch.float64)
 
 		result = analyze_f([w1, b1, w2, b2], torch.tensor([[0.], [0.]], dtype=torch.float64),
-		                   torch.tensor([[1.], [1.]], dtype=torch.float64), 2, 0, compute_linear_bounds_test, -1e10)
+		                   torch.tensor([[1.], [1.]], dtype=torch.float64), 0, compute_linear_bounds_test, -1e10)
 		return result
 
 
@@ -120,7 +126,7 @@ if __name__ == '__main__':
 		b3 = torch.tensor([3., 0.], dtype=torch.float64)
 
 		result = analyze_f([w1, b1, w2, b2, w3, b3], torch.tensor([[-1.], [-1.]], dtype=torch.float64),
-		                   torch.tensor([[1.], [1.]], dtype=torch.float64), 2, 0,
+		                   torch.tensor([[1.], [1.]], dtype=torch.float64), 0,
 		                   [compute_linear_bounds_test1, compute_linear_bounds_test2])
 		return result
 
