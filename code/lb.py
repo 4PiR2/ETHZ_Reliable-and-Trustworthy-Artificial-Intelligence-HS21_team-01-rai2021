@@ -52,7 +52,7 @@ def compute_linear_bounds(l, u, t_l=.5, t_u=.5):
 		t_l = (1. - t_l) * l + t_l * u
 	if type(t_u) is float:
 		t_u = (1. - t_u) * l + t_u * u
-	# L1: scant @ l, min(0, u) (t <= 0)
+	# L1: scant @ l, min(0, u) (t < 0)
 	# L2: tangent @ t (t >= 0)
 	w_l, b_l = get_tanget_line(t_l)
 	# test @ 0

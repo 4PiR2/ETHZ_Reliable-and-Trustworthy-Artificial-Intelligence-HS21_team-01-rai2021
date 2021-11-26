@@ -12,10 +12,14 @@ INPUT_SIZE = 28
 def analyze(net, inputs, eps, true_label):
 	weights_affine = net.state_dict()
 	weights_affine = [weights_affine[k].double() for k in weights_affine]
-	l = net.layers[:2](inputs - eps).T.double()
-	u = net.layers[:2](inputs + eps).T.double()
-	extended = [lambda l, u: compute_linear_bounds(l, u, i / 10, 1. - i / 10) for i in range(10 + 1)]
-	for f in [compute_linear_bounds, compute_linear_bounds_boxlike, *extended]:
+	l = torch.maximum(inputs - eps, torch.zeros(inputs.shape, dtype=torch.float64))
+	u = torch.minimum(inputs + eps, torch.ones(inputs.shape, dtype=torch.float64))
+	l = net.layers[:2](l).T.double()
+	u = net.layers[:2](u).T.double()
+	extension = []
+	extension += [lambda l, u: compute_linear_bounds(l, u, i / 10, i / 10) for i in range(10 + 1)]
+	extension += [lambda l, u: compute_linear_bounds(l, u, i / 10, 1. - i / 10) for i in range(10 + 1)]
+	for f in [compute_linear_bounds, compute_linear_bounds_boxlike, *extension]:
 		if analyze_f(weights_affine, l, u, true_label, f):
 			return True
 	return False

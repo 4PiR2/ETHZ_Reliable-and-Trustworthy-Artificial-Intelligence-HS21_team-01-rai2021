@@ -5,10 +5,9 @@ from verifier import main
 
 argv_backup = sys.argv
 
-print('testcase 1')
 k = '0'
 net = 'fc1'
-spec = 'example_img0_0.01800.txt'
+spec = 'example_img1_0.05000.txt'
 sys.argv = argv_backup + ['--net', 'net' + k + '_' + net, '--spec', '../test_cases/net' + k + '_' + net + '/' + spec]
 result = main()
 
