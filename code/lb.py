@@ -44,6 +44,34 @@ def get_scant_line(p, q):
 	return w, b
 
 
+def solve_U2(X, U):
+	# Newton's method
+	t = get_const_tensor(0., len(X))
+	for i in range(len(X)):
+		x, u = X[i], U[i]
+		u2 = u ** 2
+		a = u2 - .5
+		b = 2. * u2 + u
+		c = u2 + .5
+
+		ex = torch.exp(-x)
+		aex2 = a * ex ** 2
+		x_b = x - b
+		f0 = aex2 - x_b * ex + c
+		f1 = -2. * aex2 + x_b - 1.
+		f0_pre = f0 - 1.
+		while f0_pre < f0:
+			f0_pre = f0
+			x -= f0 / f1
+			ex = torch.exp(-x)
+			aex2 = a * ex ** 2
+			x_b = x - b
+			f0 = aex2 - x_b * ex + c
+			f1 = -2. * aex2 + x_b - 1.
+		t[i] = x
+	return t
+
+
 def compute_linear_bounds(l, u, t_l=.5, t_u=.5):
 	# minimum area
 	# input: n-dim vector l, u (float64 tensor)
@@ -59,25 +87,48 @@ def compute_linear_bounds(l, u, t_l=.5, t_u=.5):
 	mask = b_l > -.5
 	w_l[mask], b_l[mask] = get_scant_line(l[mask], torch.minimum(get_const_tensor(0., len(l[mask])), u[mask]))
 	# U1: tangent @ t
-	# U2: tangent @ a (solve s(a)(s(a) - 1.) = (u ** 2 - .5 + s(a)) / (u - a), not implemented)
-	# U3: tangent @ l (never used for u >= -l (mask always false))
+	# U2: tangent @ a (solve s(a)(s(a) - 1.) = (u ** 2 - .5 + s(a)) / (u - a))
+	# U3: tangent @ l (never used for u >= -l (mask3 always false))
 	# U4: scant @ l, u
+	tolerance = 1e-11  # lazy switch
 	w_u, b_u = get_tanget_line(t_u)
 	# test @ u
-	mask = torch.bitwise_or(w_u * u + b_u < spu_0(u), t_u >= 0.)
-	w_u[mask], b_u[mask] = get_tanget_line(l[mask])
+	mask3 = torch.bitwise_or(w_u * u + b_u + tolerance < spu_0(u), t_u >= 0.)
+	w_u[mask3], b_u[mask3] = get_tanget_line(l[mask3])
 	# test @ u
-	mask = w_u * u + b_u < spu_0(u)
-	w_u[mask], b_u[mask] = get_scant_line(l[mask], u[mask])
+	mask4 = w_u * u + b_u + tolerance < spu_0(u)
+	w_u[mask4], b_u[mask4] = get_scant_line(l[mask4], u[mask4])
+	mask2 = torch.bitwise_and(mask3, ~mask4)
+	w_u[mask2], b_u[mask2] = get_tanget_line(solve_U2(l[mask2], u[mask2]))
 	return (w_l, b_l), (w_u, b_u)
 
 
-def compute_linear_bounds_boxlike(l, u):
+def lb_boxlike(l, u):
 	# optimal box-comparable
 	return compute_linear_bounds(l, u, torch.minimum(torch.maximum(get_const_tensor(0., len(l)), l), u), l)
 
 
-def compute_linear_bounds_box(l, u):
+def lb_parallelogram(l, u):
+	# best-effort parallelogram
+	(w_l, b_l), (w_u, b_u) = compute_linear_bounds(l, u)
+	mask1 = w_u >= 0.
+	w_l[mask1], b_l[mask1] = get_tanget_line(w_u[mask1] * .5)
+	mask2 = torch.bitwise_and(u > 0., w_l < w_u)
+	w_l[mask2] = w_u[mask2]
+	b_l[mask2] = -.5
+	mask3 = u <= 0.
+	t = torch.sqrt(1. + 4. * w_l[mask3])
+	t = torch.log(1. - t) - torch.log(1. + t)
+	w_u[mask3], b_u[mask3] = get_tanget_line(t)
+	return (w_l, b_l), (w_u, b_u)
+
+
+def lb_little(l, u):
+	t = torch.where((l + u) * .5 >= 0., u, l)
+	return compute_linear_bounds(l, u, t, t)
+
+
+def lb_box(l, u):
 	# box, not recommended
 	w_l = get_const_tensor(0., len(l))
 	w_u = w_l
@@ -95,13 +146,14 @@ def compute_linear_bounds_box(l, u):
 
 if __name__ == '__main__':
 	# test
-	epsilon = 1e-10
-	n = 10000
+	f = lb_parallelogram
+	n = 1000
 	visualize = 100
+	epsilon = 1e-10
 
 	l, u = torch.randn(n, dtype=torch.float64), torch.randn(n, dtype=torch.float64)
 	l, u = torch.minimum(l, u), torch.maximum(l, u)
-	(w_l, b_l), (w_u, b_u) = compute_linear_bounds_boxlike(l, u)
+	(w_l, b_l), (w_u, b_u) = f(l, u)
 	x = torch.stack([torch.linspace(li, ui, 10000, dtype=torch.float64) for li, ui in zip(l, u)], dim=1)
 	y = spu_0(x)
 	diff_l = w_l * x + b_l - y

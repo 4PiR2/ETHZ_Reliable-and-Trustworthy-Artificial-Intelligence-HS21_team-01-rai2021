@@ -6,8 +6,8 @@ from verifier import main
 argv_backup = sys.argv
 
 k = '0'
-net = 'fc1'
-spec = 'example_img1_0.05000.txt'
+net = 'fc2'
+spec = 'example_img0_0.09500.txt'
 sys.argv = argv_backup + ['--net', 'net' + k + '_' + net, '--spec', '../test_cases/net' + k + '_' + net + '/' + spec]
 result = main()
 
@@ -30,6 +30,7 @@ for net in ['fc1', 'fc2', 'fc3', 'fc4', 'fc5']:
 			if result != gt:
 				print(name)
 				print(gt, '(gt)', '--', result, '(out)')
+				# main()
 			if result == 'verified':
 				if gt == 'verified':
 					score += 1
