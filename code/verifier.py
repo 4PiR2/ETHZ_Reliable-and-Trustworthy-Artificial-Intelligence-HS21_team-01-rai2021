@@ -2,7 +2,7 @@ import argparse
 import torch
 from networks import FullyConnected
 
-from lb import compute_linear_bounds, lb_boxlike, lb_parallelogram, lb_little
+from lb import lb_random_mix, lb_base, lb_boxlike, lb_parallelogram, lb_little, lb_box
 from bs import analyze_f
 
 DEVICE = 'cpu'
@@ -16,11 +16,17 @@ def analyze(net, inputs, eps, true_label):
 	u = torch.minimum(inputs + eps, torch.ones(inputs.shape))
 	l = net.layers[:2](l).T.double()
 	u = net.layers[:2](u).T.double()
-	extension = []
-	# extension += [lambda l, u: compute_linear_bounds(l, u, i / 10, i / 10) for i in range(10 + 1)]
-	# extension += [lambda l, u: compute_linear_bounds(l, u, i / 10, 1. - i / 10) for i in range(10 + 1)]
-	# extension += [[compute_linear_bounds, lb_boxlike], [lb_boxlike, compute_linear_bounds]]
-	for f in [compute_linear_bounds, lb_boxlike, lb_parallelogram, lb_little, *extension]:
+	f_base_list = [lb_base, lb_boxlike, lb_parallelogram, lb_little]
+	# f_base_list += [[compute_linear_bounds, lb_boxlike], [lb_boxlike, compute_linear_bounds]]
+	# for i in range(10 + 1):
+	# 	for j in range(10 + 1):
+	# 		f_base_list += [lambda l, u: compute_linear_bounds(l, u, i / 10, j / 10)]
+	for f in f_base_list:
+		if analyze_f(weights_affine, l, u, true_label, f):
+			return True
+	f_random_list = [lb_base, lb_boxlike]
+	for _ in range(100):
+		f = lambda l, u: lb_random_mix(l, u, f_random_list)
 		if analyze_f(weights_affine, l, u, true_label, f):
 			return True
 	return False

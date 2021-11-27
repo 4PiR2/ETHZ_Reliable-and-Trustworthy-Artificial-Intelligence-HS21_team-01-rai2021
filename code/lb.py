@@ -72,8 +72,10 @@ def solve_U2(X, U):
 	return t
 
 
-def compute_linear_bounds(l, u, t_l=.5, t_u=.5):
-	# minimum area
+def lb_base(l, u, t_l=.5, t_u=.5):
+	# compute linear bounds base function
+	# convex hull tangent line model
+	# default: tangent @ mid-point (minimum area trapezoid)
 	# input: n-dim vector l, u (float64 tensor)
 	# output: n-dim vector w_l, b_l, w_u, b_u (float64 tensor)
 	if type(t_l) is float:
@@ -105,27 +107,27 @@ def compute_linear_bounds(l, u, t_l=.5, t_u=.5):
 
 def lb_boxlike(l, u):
 	# optimal box-comparable
-	return compute_linear_bounds(l, u, torch.minimum(torch.maximum(get_const_tensor(0., len(l)), l), u), l)
+	return lb_base(l, u, torch.minimum(torch.maximum(get_const_tensor(0., len(l)), l), u), l)
 
 
 def lb_parallelogram(l, u):
-	# best-effort parallelogram
-	(w_l, b_l), (w_u, b_u) = compute_linear_bounds(l, u)
+	# minimum area parallelogram
+	(w_l, b_l), (w_u, b_u) = lb_base(l, u)
 	mask1 = w_u >= 0.
 	w_l[mask1], b_l[mask1] = get_tanget_line(w_u[mask1] * .5)
-	mask2 = torch.bitwise_and(u > 0., w_l < w_u)
+	mask2 = torch.bitwise_or(torch.bitwise_and(u > 0., w_l < w_u), torch.bitwise_and(w_l > 0., w_u < 0.))
 	w_l[mask2] = w_u[mask2]
 	b_l[mask2] = -.5
-	mask3 = u <= 0.
+	mask3 = w_l != w_u
 	t = torch.sqrt(1. + 4. * w_l[mask3])
 	t = torch.log(1. - t) - torch.log(1. + t)
-	w_u[mask3], b_u[mask3] = get_tanget_line(t)
-	return (w_l, b_l), (w_u, b_u)
+	_, b_u[mask3] = get_tanget_line(t)
+	return (w_l, b_l), (w_l, b_u)
 
 
 def lb_little(l, u):
 	t = torch.where((l + u) * .5 >= 0., u, l)
-	return compute_linear_bounds(l, u, t, t)
+	return lb_base(l, u, t, t)
 
 
 def lb_box(l, u):
@@ -144,11 +146,24 @@ def lb_box(l, u):
 	return (w_l, b_l), (w_u, b_u)
 
 
+def lb_random_mix(l, u, f_list):
+	# very useful for fc1!
+	index = torch.randint(len(f_list), [len(l)])
+	w_l = get_const_tensor(0., len(l))
+	b_l = get_const_tensor(0., len(l))
+	w_u = get_const_tensor(0., len(l))
+	b_u = get_const_tensor(0., len(l))
+	for i in range(len(f_list)):
+		mask = index == i
+		(w_l[mask], b_l[mask]), (w_u[mask], b_u[mask]) = f_list[i](l[mask], u[mask])
+	return (w_l, b_l), (w_u, b_u)
+
+
 if __name__ == '__main__':
 	# test
-	f = lb_parallelogram
+	f = lambda l, u: lb_random_mix(l, u, [lb_base, lb_boxlike, lb_parallelogram, lb_little, lb_box])
 	n = 1000
-	visualize = 100
+	visualize = 0
 	epsilon = 1e-10
 
 	l, u = torch.randn(n, dtype=torch.float64), torch.randn(n, dtype=torch.float64)
