@@ -147,7 +147,7 @@ def lb_box(l, u):
 
 
 def lb_random_mix(l, u, f_list):
-	# very useful for fc1!
+	# random selection for each node
 	index = torch.randint(len(f_list), [len(l)])
 	w_l = get_const_tensor(0., len(l))
 	b_l = get_const_tensor(0., len(l))

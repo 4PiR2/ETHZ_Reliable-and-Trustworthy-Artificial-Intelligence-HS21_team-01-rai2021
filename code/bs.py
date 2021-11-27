@@ -73,9 +73,7 @@ def analyze_f(weights_affine, l, u, true_label, f, margin=0.):
 	w_out[:, true_label] -= 1.
 	add_weights(weights_l, weights_u, is_affine_layers, w_out)
 	l, u = back_substitution(weights_l, weights_u, is_affine_layers)
-
-	result = torch.all(u < -margin)
-	return result
+	return (u < -margin).flatten()
 
 
 if __name__ == '__main__':
@@ -97,7 +95,7 @@ if __name__ == '__main__':
 
 		result = analyze_f([w1, b1, w2, b2], torch.tensor([[0.], [0.]], dtype=torch.float64),
 		                   torch.tensor([[1.], [1.]], dtype=torch.float64), 0, compute_linear_bounds_test, -1e10)
-		return result
+		return torch.all(result)
 
 
 	def test_lec6():
@@ -128,7 +126,7 @@ if __name__ == '__main__':
 		result = analyze_f([w1, b1, w2, b2, w3, b3], torch.tensor([[-1.], [-1.]], dtype=torch.float64),
 		                   torch.tensor([[1.], [1.]], dtype=torch.float64), 0,
 		                   [compute_linear_bounds_test1, compute_linear_bounds_test2])
-		return result
+		return torch.all(result)
 
 
 	assert test_hw6()

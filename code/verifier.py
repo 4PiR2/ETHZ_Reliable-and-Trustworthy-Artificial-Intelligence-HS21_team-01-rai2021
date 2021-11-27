@@ -12,22 +12,22 @@ INPUT_SIZE = 28
 def analyze(net, inputs, eps, true_label):
 	weights_affine = net.state_dict()
 	weights_affine = [weights_affine[k].double() for k in weights_affine]
+	n_spu_layers = len(weights_affine) // 2 - 1
 	l = torch.maximum(inputs - eps, torch.zeros(inputs.shape))
 	u = torch.minimum(inputs + eps, torch.ones(inputs.shape))
 	l = net.layers[:2](l).T.double()
 	u = net.layers[:2](u).T.double()
-	f_base_list = [lb_base, lb_boxlike, lb_parallelogram, lb_little]
-	# f_base_list += [[compute_linear_bounds, lb_boxlike], [lb_boxlike, compute_linear_bounds]]
+	result_t = torch.zeros(10 - 1, dtype=torch.bool)
+	f_list = [lb_base, lb_boxlike, lb_parallelogram, lb_little]
+	f_list += [[*([lb_base] * (n_spu_layers - 1)), lambda l, u: lb_random_mix(l, u, [lb_base, lb_boxlike])],
+	           [*([lb_boxlike] * (n_spu_layers - 1)), lambda l, u: lb_random_mix(l, u, [lb_base, lb_boxlike])]] * 1000
 	# for i in range(10 + 1):
 	# 	for j in range(10 + 1):
-	# 		f_base_list += [lambda l, u: compute_linear_bounds(l, u, i / 10, j / 10)]
-	for f in f_base_list:
-		if analyze_f(weights_affine, l, u, true_label, f):
-			return True
-	f_random_list = [lb_base, lb_boxlike]
-	for _ in range(100):
-		f = lambda l, u: lb_random_mix(l, u, f_random_list)
-		if analyze_f(weights_affine, l, u, true_label, f):
+	# 		f_list += [lambda l, u: compute_linear_bounds(l, u, i / 10, j / 10)]
+	for f in f_list:
+		result = analyze_f(weights_affine, l, u, true_label, f)
+		result_t = torch.bitwise_or(result, result_t)
+		if torch.all(result_t):
 			return True
 	return False
 
