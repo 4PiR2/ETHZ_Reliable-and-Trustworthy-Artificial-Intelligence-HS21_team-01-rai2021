@@ -26,6 +26,8 @@ for net in ['fc1', 'fc2', 'fc3', 'fc4', 'fc5']:
 			                          '../test_cases/net' + k + '_' + net + '/' + spec]
 			name = 'net' + k + '_' + net + ',' + spec
 			gt = gts[name]
+			# if gt == 'not verified':
+			# 	continue
 			result = 'verified' if main() else 'not verified'
 			if result != gt:
 				print(name)

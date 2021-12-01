@@ -10,12 +10,6 @@ def get_homogeneous_weight(w, b):
 
 def get_spu_weights(l, u, f):
 	(w_l, b_l), (w_u, b_u) = f(l.flatten()[:-1], u.flatten()[:-1])
-	if False:  # debug
-		with open('../tmp/bs_spu_log/1.txt', 'w') as file:
-			for i in range(len(w_l)):
-				line = '\t'.join([str(float(x)) for x in [l[i], u[i], w_l[i], b_l[i], w_u[i], b_u[i]]]) + '\n'
-				file.write(line)
-		exit()
 	W_l = get_homogeneous_weight(torch.diag(w_l), b_l)
 	W_u = get_homogeneous_weight(torch.diag(w_u), b_u)
 	return W_l, W_u

@@ -2,8 +2,12 @@ import argparse
 import torch
 from networks import FullyConnected
 
-from lb import lb_random_mix, lb_base, lb_boxlike, lb_parallelogram, lb_little, lb_box
+import time
+import torch.optim as optim
+
+from lb import lb_random_mix, lb_base, lb_boxlike, lb_parallelogram
 from bs import analyze_f
+from bs2 import Net
 
 DEVICE = 'cpu'
 INPUT_SIZE = 28
@@ -12,13 +16,41 @@ INPUT_SIZE = 28
 def analyze(net, inputs, eps, true_label):
 	weights_affine = net.state_dict()
 	weights_affine = [weights_affine[k].double() for k in weights_affine]
+	l = torch.maximum(inputs - eps, torch.zeros(inputs.shape))
+	u = torch.minimum(inputs + eps, torch.ones(inputs.shape))
+	l = net.layers[:2](l).T.double()
+	u = net.layers[:2](u).T.double()
+
+	net = Net(weights_affine, l, u, true_label)
+	optimizer = optim.Adam(net.parameters(), lr=1e-1)
+	_ = net.forward(f_init=lb_boxlike)
+	result = net.forward(f_init=lb_base)
+	# ts = time.time()
+	# count = 0
+	while len(result) > 0:
+		optimizer.zero_grad()
+		loss = torch.max(result)
+		loss.backward()
+		optimizer.step()
+		result = net.forward(f_clip=lb_boxlike)
+		# count += 1
+		# if time.time() - ts > 60:
+		# 	break
+	if len(result) == 0:
+		return True
+	return False
+
+
+def analyze_old(net, inputs, eps, true_label):
+	weights_affine = net.state_dict()
+	weights_affine = [weights_affine[k].double() for k in weights_affine]
 	n_spu_layers = len(weights_affine) // 2 - 1
 	l = torch.maximum(inputs - eps, torch.zeros(inputs.shape))
 	u = torch.minimum(inputs + eps, torch.ones(inputs.shape))
 	l = net.layers[:2](l).T.double()
 	u = net.layers[:2](u).T.double()
 	result_t = torch.zeros(10 - 1, dtype=torch.bool)
-	f_list = [lb_base, lb_boxlike, lb_parallelogram, lb_little]
+	f_list = [lb_base, lb_boxlike, lb_parallelogram]
 	f_list += [[*([lb_base] * (n_spu_layers - 1)), lambda l, u: lb_random_mix(l, u, [lb_base, lb_boxlike])],
 	           [*([lb_boxlike] * (n_spu_layers - 1)), lambda l, u: lb_random_mix(l, u, [lb_base, lb_boxlike])]] * 1000
 	# for i in range(10 + 1):

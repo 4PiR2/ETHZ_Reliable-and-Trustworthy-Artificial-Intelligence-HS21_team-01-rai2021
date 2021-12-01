@@ -125,11 +125,6 @@ def lb_parallelogram(l, u):
 	return (w_l, b_l), (w_l, b_u)
 
 
-def lb_little(l, u):
-	t = torch.where((l + u) * .5 >= 0., u, l)
-	return lb_base(l, u, t, t)
-
-
 def lb_box(l, u):
 	# box, not recommended
 	w_l = get_const_tensor(0., len(l))
