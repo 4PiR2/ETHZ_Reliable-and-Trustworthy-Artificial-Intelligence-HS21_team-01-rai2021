@@ -29,7 +29,7 @@ def analyze(net, inputs, eps, true_label):
 	count = 0
 	while len(result) > 0:
 		optimizer.zero_grad()
-		loss = torch.max(result)
+		loss = result[0]
 		loss.backward()
 		optimizer.step()
 		result = net.forward()
