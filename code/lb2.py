@@ -1,6 +1,6 @@
 import torch
 
-from lb import get_const_tensor, spu_0
+from lb import get_const_tensor, spu_0, lb_base
 
 
 def spu_1_inv(x):
@@ -45,9 +45,19 @@ def lb_slope(l, u, w_l, w_u):
 
 
 def is_intersect(l, u, w_1, b_1, w_2, b_2):
-	# w_1 == w_2 and b_1 == b_2: return false
+	# w_1 == w_2 and b_1 == b_2: return False
+	tolerance = 1e-15
 	x = (b_2 - b_1) / (w_1 - w_2)
-	return torch.bitwise_and(l < x, u > x)
+	return torch.bitwise_and(l + tolerance < x, u - tolerance > x)
+
+
+def slope_clip(l, u, w_l, w_u):
+	for f in [lambda l, u: lb_base(l, u, 0., 0.), lambda l, u: lb_base(l, u, 1., 1.)]:
+		b_l, b_u = lb_slope(l, u, w_l, w_u)
+		(w_l_c, b_l_c), (w_u_c, b_u_c) = f(l, u)
+		w_l = torch.where(is_intersect(l, u, w_l, b_l, w_l_c, b_l_c), w_l, w_l_c)
+		w_u = torch.where(is_intersect(l, u, w_u, b_u, w_u_c, b_u_c), w_u, w_u_c)
+	return w_l, w_u
 
 
 if __name__ == '__main__':
@@ -59,7 +69,7 @@ if __name__ == '__main__':
 	w_l, w_u = torch.randn(n, dtype=torch.float64), torch.randn(n, dtype=torch.float64)
 	l, u = torch.randn(n, dtype=torch.float64), torch.randn(n, dtype=torch.float64)
 	l, u = torch.minimum(l, u), torch.maximum(l, u)
-	b_l, b_u = lb2(l, u, w_l, w_u)
+	b_l, b_u = lb_slope(l, u, w_l, w_u)
 	x = torch.stack([torch.linspace(li, ui, 10000, dtype=torch.float64) for li, ui in zip(l, u)], dim=1)
 	y = spu_0(x)
 	diff_l = w_l * x + b_l - y

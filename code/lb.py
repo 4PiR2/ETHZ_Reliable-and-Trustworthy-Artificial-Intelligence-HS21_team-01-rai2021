@@ -92,7 +92,7 @@ def lb_base(l, u, t_l=.5, t_u=.5):
 	# U2: tangent @ a (solve s(a)(s(a) - 1.) = (u ** 2 - .5 + s(a)) / (u - a))
 	# U3: tangent @ l (never used for u >= -l (mask3 always false))
 	# U4: scant @ l, u
-	tolerance = 1e-11  # lazy switch
+	tolerance = 1e-15  # lazy switch
 	w_u, b_u = get_tanget_line(t_u)
 	# test @ u
 	mask3 = torch.bitwise_or(w_u * u + b_u + tolerance < spu_0(u), t_u >= 0.)

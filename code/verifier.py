@@ -21,23 +21,25 @@ def analyze(net, inputs, eps, true_label):
 	l = net.layers[:2](l).T.double()
 	u = net.layers[:2](u).T.double()
 
-	net = Net(weights_affine, l, u, true_label)
+	net = Net(weights_affine, l, u, true_label, margin=1e-11)
 	optimizer = optim.Adam(net.parameters(), lr=1e-1)
 	_ = net.forward(f_init=lb_boxlike)
 	result = net.forward(f_init=lb_base)
-	# ts = time.time()
-	# count = 0
+	ts = time.time()
+	count = 0
 	while len(result) > 0:
 		optimizer.zero_grad()
 		loss = torch.max(result)
 		loss.backward()
 		optimizer.step()
-		result = net.forward(f_clip=lb_boxlike)
-		# count += 1
-		# if time.time() - ts > 60:
-		# 	break
+		result = net.forward()
+		count += 1
+		if time.time() - ts > 61:
+			break
 	if len(result) == 0:
+		# print(count, 'v')
 		return True
+	# print(count, 'nv')
 	return False
 
 
