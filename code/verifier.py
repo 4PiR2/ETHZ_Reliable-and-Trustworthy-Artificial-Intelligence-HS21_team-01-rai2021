@@ -5,9 +5,8 @@ from networks import FullyConnected
 import time
 import torch.optim as optim
 
-from lb import lb_random_mix, lb_base, lb_boxlike, lb_parallelogram
-from bs import analyze_f
-from bs2 import Net
+from lb import lb_base, lb_boxlike, lb_parallelogram
+from bs import Net
 
 DEVICE = 'cpu'
 INPUT_SIZE = 28
@@ -26,44 +25,15 @@ def analyze(net, inputs, eps, true_label):
 	_ = net.forward(f_init=lb_boxlike)
 	result = net.forward(f_init=lb_base)
 	ts = time.time()
-	count = 0
 	while len(result) > 0:
 		optimizer.zero_grad()
 		loss = result[0]
 		loss.backward()
 		optimizer.step()
 		result = net.forward()
-		count += 1
-		if time.time() - ts > 61:
-			break
-	if len(result) == 0:
-		# print(count, 'v')
-		return True
-	# print(count, 'nv')
-	return False
-
-
-def analyze_old(net, inputs, eps, true_label):
-	weights_affine = net.state_dict()
-	weights_affine = [weights_affine[k].double() for k in weights_affine]
-	n_spu_layers = len(weights_affine) // 2 - 1
-	l = torch.maximum(inputs - eps, torch.zeros(inputs.shape))
-	u = torch.minimum(inputs + eps, torch.ones(inputs.shape))
-	l = net.layers[:2](l).T.double()
-	u = net.layers[:2](u).T.double()
-	result_t = torch.zeros(10 - 1, dtype=torch.bool)
-	f_list = [lb_base, lb_boxlike, lb_parallelogram]
-	f_list += [[*([lb_base] * (n_spu_layers - 1)), lambda l, u: lb_random_mix(l, u, [lb_base, lb_boxlike])],
-	           [*([lb_boxlike] * (n_spu_layers - 1)), lambda l, u: lb_random_mix(l, u, [lb_base, lb_boxlike])]] * 1000
-	# for i in range(10 + 1):
-	# 	for j in range(10 + 1):
-	# 		f_list += [lambda l, u: compute_linear_bounds(l, u, i / 10, j / 10)]
-	for f in f_list:
-		result = analyze_f(weights_affine, l, u, true_label, f)
-		result_t = torch.bitwise_or(result, result_t)
-		if torch.all(result_t):
-			return True
-	return False
+		if time.time() - ts > 120:
+			return False
+	return True
 
 
 def main():

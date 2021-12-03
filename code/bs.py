@@ -1,4 +1,7 @@
 import torch
+from torch import nn
+
+from lb import lb_slope, slope_clip
 
 
 def get_homogeneous_weight(w, b):
@@ -41,37 +44,97 @@ def back_substitution(weights_l, weights_u, is_affine_layers=None):
 	return l, u
 
 
-def analyze_f(weights_affine, l, u, true_label, f, margin=0.):
-	weights_affine = [get_homogeneous_weight(weights_affine[2 * i], weights_affine[2 * i + 1]) for i in
-	                  range(len(weights_affine) // 2)]
-	# homogeneous coordinates (append 1)
-	l = torch.cat([l, torch.ones((1, 1), dtype=torch.float64)], 0)
-	u = torch.cat([u, torch.ones((1, 1), dtype=torch.float64)], 0)
+class Net(nn.Module):
+	def __init__(self, weights_affine, l, u, true_label, margin=0.):
+		super().__init__()
+		weights_affine = [get_homogeneous_weight(weights_affine[2 * i], weights_affine[2 * i + 1]) for i in
+		                  range(len(weights_affine) // 2)]
+		self.weights_affine = weights_affine
+		# homogeneous coordinates (append 1)
+		l = torch.cat([l, torch.ones((1, 1), dtype=torch.float64)], 0)
+		u = torch.cat([u, torch.ones((1, 1), dtype=torch.float64)], 0)
+		self.inputs = [l, u]
+		self.true_label = true_label
+		self.margin = margin
+		w_out = torch.eye(len(weights_affine[-1]), dtype=torch.float64)
+		w_out = torch.cat([w_out[:true_label], w_out[true_label + 1:-1]], 0)
+		w_out[:, true_label] -= 1.
+		self.w_out = w_out
+		self.spu_l_params = nn.ParameterList(
+			[nn.Parameter(torch.zeros(len(w) - 1, dtype=torch.float64)) for w in weights_affine[:-1]])
+		self.spu_u_params = nn.ParameterList(
+			[nn.Parameter(torch.zeros(len(w) - 1, dtype=torch.float64)) for w in weights_affine[:-1]])
+		self.verified_mask = torch.zeros(len(w_out), dtype=torch.bool)
 
-	weights_l = []
-	weights_u = []
-	is_affine_layers = []
-	add_weights(weights_l, weights_u, is_affine_layers, l, u)
+	def get_spu_weights(self, l, u, spu_idx, f_init=None):
+		l, u = l.flatten()[:-1], u.flatten()[:-1]
+		with torch.no_grad():
+			if f_init is not None:
+				(w_l, _), (w_u, _) = f_init(l, u)
+			else:
+				w_l, w_u = self.spu_l_params[spu_idx], self.spu_u_params[spu_idx]
+			w_l, w_u = slope_clip(l, u, w_l, w_u)
+			self.spu_l_params[spu_idx].copy_(w_l)
+			self.spu_u_params[spu_idx].copy_(w_u)
+		w_l, w_u = self.spu_l_params[spu_idx], self.spu_u_params[spu_idx]
+		b_l, b_u = lb_slope(l, u, w_l, w_u)
+		W_l = get_homogeneous_weight(torch.diag(w_l), b_l)
+		W_u = get_homogeneous_weight(torch.diag(w_u), b_u)
+		return W_l, W_u
 
-	for i in range(len(weights_affine)):
-		# l, u = back_substitution(weights_l, weights_u, is_affine_layers)  # debug
-		add_weights(weights_l, weights_u, is_affine_layers, weights_affine[i])
-		if i < len(weights_affine) - 1:
-			l, u = back_substitution(weights_l, weights_u, is_affine_layers)
-			w_l, w_u = get_spu_weights(l, u, f[i] if type(f) is list else f)
-			add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
+	def forward(self, f_init=None):
+		weights_l = []
+		weights_u = []
+		is_affine_layers = []
+		add_weights(weights_l, weights_u, is_affine_layers, *self.inputs)
 
-	# l, u = back_substitution(weights_l, weights_u, is_affine_layers)  # debug
-	w_out = torch.eye(len(weights_affine[-1]), dtype=torch.float64)
-	w_out = torch.cat([w_out[:true_label], w_out[true_label + 1:-1]], 0)
-	w_out[:, true_label] -= 1.
-	add_weights(weights_l, weights_u, is_affine_layers, w_out)
-	l, u = back_substitution(weights_l, weights_u, is_affine_layers)
-	return (u < -margin).flatten()
+		for i in range(len(self.weights_affine)):
+			add_weights(weights_l, weights_u, is_affine_layers, self.weights_affine[i])
+			if i < len(self.weights_affine) - 1:
+				l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+				if f_init is not None:
+					w_l, w_u = self.get_spu_weights(l, u, i, f_init=f_init[i] if type(f_init) is list else f_init)
+				else:
+					w_l, w_u = self.get_spu_weights(l, u, i)
+				add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
+
+		add_weights(weights_l, weights_u, is_affine_layers, self.w_out)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		self.verified_mask = torch.bitwise_or(u.flatten() < -self.margin, self.verified_mask)
+		return u[~self.verified_mask]
 
 
 if __name__ == '__main__':
 	# test
+	def analyze_f(weights_affine, l, u, true_label, f, margin=0.):
+		weights_affine = [get_homogeneous_weight(weights_affine[2 * i], weights_affine[2 * i + 1]) for i in
+		                  range(len(weights_affine) // 2)]
+		# homogeneous coordinates (append 1)
+		l = torch.cat([l, torch.ones((1, 1), dtype=torch.float64)], 0)
+		u = torch.cat([u, torch.ones((1, 1), dtype=torch.float64)], 0)
+
+		weights_l = []
+		weights_u = []
+		is_affine_layers = []
+		add_weights(weights_l, weights_u, is_affine_layers, l, u)
+
+		for i in range(len(weights_affine)):
+			# l, u = back_substitution(weights_l, weights_u, is_affine_layers)  # debug
+			add_weights(weights_l, weights_u, is_affine_layers, weights_affine[i])
+			if i < len(weights_affine) - 1:
+				l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+				w_l, w_u = get_spu_weights(l, u, f[i] if type(f) is list else f)
+				add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
+
+		# l, u = back_substitution(weights_l, weights_u, is_affine_layers)  # debug
+		w_out = torch.eye(len(weights_affine[-1]), dtype=torch.float64)
+		w_out = torch.cat([w_out[:true_label], w_out[true_label + 1:-1]], 0)
+		w_out[:, true_label] -= 1.
+		add_weights(weights_l, weights_u, is_affine_layers, w_out)
+		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		return (u < -margin).flatten()
+
+
 	def test_hw6():
 		def compute_linear_bounds_test(l, u):
 			w_l = torch.tensor([1., 0.], dtype=torch.float64)
