@@ -11,13 +11,6 @@ def get_homogeneous_weight(w, b):
 	                  torch.unsqueeze(torch.cat([b, torch.ones(1, dtype=torch.float64)], 0), 1)], 1)
 
 
-def get_spu_weights(l, u, f):
-	(w_l, b_l), (w_u, b_u) = f(l.flatten()[:-1], u.flatten()[:-1])
-	W_l = get_homogeneous_weight(torch.diag(w_l), b_l)
-	W_u = get_homogeneous_weight(torch.diag(w_u), b_u)
-	return W_l, W_u
-
-
 def add_weights(weights_l, weights_u, is_affine_layers, *args):
 	weights_l.append(args[0])
 	weights_u.append(args[-1])
@@ -45,7 +38,7 @@ def back_substitution(weights_l, weights_u, is_affine_layers=None):
 
 
 class Net(nn.Module):
-	def __init__(self, weights_affine, l, u, true_label, margin=0.):
+	def __init__(self, weights_affine, l, u, true_label):
 		super().__init__()
 		weights_affine = [get_homogeneous_weight(weights_affine[2 * i], weights_affine[2 * i + 1]) for i in
 		                  range(len(weights_affine) // 2)]
@@ -55,7 +48,6 @@ class Net(nn.Module):
 		u = torch.cat([u, torch.ones((1, 1), dtype=torch.float64)], 0)
 		self.inputs = [l, u]
 		self.true_label = true_label
-		self.margin = margin
 		w_out = torch.eye(len(weights_affine[-1]), dtype=torch.float64)
 		w_out = torch.cat([w_out[:true_label], w_out[true_label + 1:-1]], 0)
 		w_out[:, true_label] -= 1.
@@ -64,7 +56,6 @@ class Net(nn.Module):
 			[nn.Parameter(torch.zeros(len(w) - 1, dtype=torch.float64)) for w in weights_affine[:-1]])
 		self.spu_u_params = nn.ParameterList(
 			[nn.Parameter(torch.zeros(len(w) - 1, dtype=torch.float64)) for w in weights_affine[:-1]])
-		self.verified_mask = torch.zeros(len(w_out), dtype=torch.bool)
 
 	def get_spu_weights(self, l, u, spu_idx, f_init=None):
 		l, u = l.flatten()[:-1], u.flatten()[:-1]
@@ -99,14 +90,20 @@ class Net(nn.Module):
 				add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
 
 		add_weights(weights_l, weights_u, is_affine_layers, self.w_out)
-		l, u = back_substitution(weights_l, weights_u, is_affine_layers)
-		self.verified_mask = torch.bitwise_or(u.flatten() < -self.margin, self.verified_mask)
-		return u[~self.verified_mask]
+		_, u = back_substitution(weights_l, weights_u, is_affine_layers)
+		return u.flatten()
 
 
 if __name__ == '__main__':
 	# test
-	def analyze_f(weights_affine, l, u, true_label, f, margin=0.):
+	def get_spu_weights_test(l, u, f):
+		(w_l, b_l), (w_u, b_u) = f(l.flatten()[:-1], u.flatten()[:-1])
+		W_l = get_homogeneous_weight(torch.diag(w_l), b_l)
+		W_u = get_homogeneous_weight(torch.diag(w_u), b_u)
+		return W_l, W_u
+
+
+	def analyze_test(weights_affine, l, u, true_label, f, margin=0.):
 		weights_affine = [get_homogeneous_weight(weights_affine[2 * i], weights_affine[2 * i + 1]) for i in
 		                  range(len(weights_affine) // 2)]
 		# homogeneous coordinates (append 1)
@@ -123,7 +120,7 @@ if __name__ == '__main__':
 			add_weights(weights_l, weights_u, is_affine_layers, weights_affine[i])
 			if i < len(weights_affine) - 1:
 				l, u = back_substitution(weights_l, weights_u, is_affine_layers)
-				w_l, w_u = get_spu_weights(l, u, f[i] if type(f) is list else f)
+				w_l, w_u = get_spu_weights_test(l, u, f[i] if type(f) is list else f)
 				add_weights(weights_l, weights_u, is_affine_layers, w_l, w_u)
 
 		# l, u = back_substitution(weights_l, weights_u, is_affine_layers)  # debug
@@ -150,7 +147,7 @@ if __name__ == '__main__':
 		                   [-1., 1.]], dtype=torch.float64)
 		b2 = torch.tensor([0., 0.], dtype=torch.float64)
 
-		result = analyze_f([w1, b1, w2, b2], torch.tensor([[0.], [0.]], dtype=torch.float64),
+		result = analyze_test([w1, b1, w2, b2], torch.tensor([[0.], [0.]], dtype=torch.float64),
 		                   torch.tensor([[1.], [1.]], dtype=torch.float64), 0, compute_linear_bounds_test, -1e10)
 		return torch.all(result)
 
@@ -180,7 +177,7 @@ if __name__ == '__main__':
 		                   [0., 1.]], dtype=torch.float64)
 		b3 = torch.tensor([3., 0.], dtype=torch.float64)
 
-		result = analyze_f([w1, b1, w2, b2, w3, b3], torch.tensor([[-1.], [-1.]], dtype=torch.float64),
+		result = analyze_test([w1, b1, w2, b2, w3, b3], torch.tensor([[-1.], [-1.]], dtype=torch.float64),
 		                   torch.tensor([[1.], [1.]], dtype=torch.float64), 0,
 		                   [compute_linear_bounds_test1, compute_linear_bounds_test2])
 		return torch.all(result)

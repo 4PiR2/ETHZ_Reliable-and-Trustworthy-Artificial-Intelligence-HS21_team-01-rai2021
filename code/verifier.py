@@ -5,7 +5,7 @@ from networks import FullyConnected
 import time
 import torch.optim as optim
 
-from lb import lb_base, lb_boxlike, lb_parallelogram
+from lb import lb_base, lb_boxlike, lb_parallelogram, lb_box
 from bs import Net
 
 DEVICE = 'cpu'
@@ -20,19 +20,30 @@ def analyze(net, inputs, eps, true_label):
 	l = net.layers[:2](l).T.double()
 	u = net.layers[:2](u).T.double()
 
-	net = Net(weights_affine, l, u, true_label, margin=1e-11)
-	optimizer = optim.Adam(net.parameters(), lr=1e-1)
-	_ = net.forward(f_init=lb_boxlike)
-	result = net.forward(f_init=lb_base)
-	ts = time.time()
-	while len(result) > 0:
-		optimizer.zero_grad()
-		loss = result[0]
-		loss.backward()
-		optimizer.step()
-		result = net.forward()
-		if time.time() - ts > 120:
-			return False
+	net_deep_poly = Net(weights_affine, l, u, true_label)
+	optimizer = optim.Adam(net_deep_poly.parameters(), lr=1e-1)
+	verified_mask = torch.zeros(9, dtype=torch.bool)
+	margin = 1e-11
+
+	# ts = time.time()
+
+	for f in [lb_base, lb_boxlike]:
+		result = net_deep_poly.forward(f_init=f)
+		verified_mask = torch.bitwise_or(result < -margin, verified_mask)
+
+	for i in range(9):
+		# if verified_mask[i]:
+		# 	continue
+		# result = net_deep_poly.forward(f_init=lb_boxlike)
+		# verified_mask = torch.bitwise_or(result < -margin, verified_mask)
+		while not verified_mask[i]:
+			optimizer.zero_grad()
+			result[i].backward()
+			optimizer.step()
+			result = net_deep_poly.forward()
+			verified_mask = torch.bitwise_or(result < -margin, verified_mask)
+			# if time.time() - ts > 61:
+			# 	return False
 	return True
 
 

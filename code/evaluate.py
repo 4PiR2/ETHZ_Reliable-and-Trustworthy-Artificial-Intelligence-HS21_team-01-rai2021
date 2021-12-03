@@ -45,14 +45,17 @@
 # 44 net1_fc5 final_img6_0.03500.txt verified
 
 test_list_full = range(45)
-test_list_10 = range(20)
+test_list_test = range(20)
 test_list_prelim = range(20, 45)
 test_list_v = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 12, 15, 17, 18, 19, 21, 22, 24, 26, 27, 29, 30, 31, 32, 33, 35, 36, 39,
                40, 41, 42, 43, 44]
 test_list_nv = [6, 11, 13, 14, 16, 20, 23, 25, 28, 34, 37, 38]
 
-test_list = [27, 30, 31]
+# test_list = [27, 30, 31]
+test_list = test_list_full
 # test_list = test_list_v
+# test_list = [0, 1, 2, 3, 4, 5, 7, 8, 9, 10, 12, 15, 17, 18, 19]
+# test_list = [21, 22, 24, 26, 29, 32, 33, 35, 36, 39, 40, 41, 42, 43, 44]
 
 import os
 import sys
@@ -91,8 +94,6 @@ score_total = 0
 for i in test_list:
 	t = test_cases[i]
 	sys.argv = argv_backup + ['--net', t['net'], '--spec', os.path.join(t['dir'], t['net'], t['test case'])]
-	if t['ground truth'] == 'not verified':
-		continue
 	print(t['id'], t['net'], t['test case'])
 	ts = time.time()
 	t['result'] = 'verified' if main() else 'not verified'
