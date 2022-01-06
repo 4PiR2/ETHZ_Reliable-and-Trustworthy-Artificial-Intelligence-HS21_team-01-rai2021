@@ -1,0 +1,103 @@
+net,test case,ground truth,your output,your runtime,your point
+net0_fc1,final_img0_0.01950.txt,not verified,timeout (not verified),60,0
+net0_fc1,final_img1_0.01700.txt,verified,verified,0.687,1
+net0_fc1,final_img2_0.03600.txt,verified,verified,1.013,1
+net0_fc1,final_img3_0.02800.txt,not verified,timeout (not verified),60,0
+net0_fc1,final_img4_0.05700.txt,not verified,timeout (not verified),60,0
+net0_fc1,final_img5_0.01400.txt,verified,verified,0.712,1
+net0_fc1,final_img6_0.02400.txt,not verified,timeout (not verified),60,0
+net0_fc1,final_img7_0.02900.txt,verified,verified,1.093,1
+net0_fc1,final_img8_0.02100.txt,verified,verified,0.726,1
+net0_fc1,final_img9_0.02600.txt,verified,verified,0.73,1
+net1_fc1,final_img0_0.06800.txt,verified,verified,0.988,1
+net1_fc1,final_img1_0.03800.txt,not verified,timeout (not verified),60,0
+net1_fc1,final_img2_0.09100.txt,verified,verified,0.732,1
+net1_fc1,final_img3_0.09700.txt,verified,verified,0.939,1
+net1_fc1,final_img4_0.04900.txt,not verified,timeout (not verified),60,0
+net1_fc1,final_img5_0.02950.txt,not verified,timeout (not verified),60,0
+net1_fc1,final_img6_0.07400.txt,verified,verified,0.868,1
+net1_fc1,final_img7_0.03400.txt,not verified,timeout (not verified),60,0
+net1_fc1,final_img8_0.08600.txt,verified,verified,0.99,1
+net1_fc1,final_img9_0.05200.txt,verified,verified,1.053,1
+net0_fc2,final_img0_0.07400.txt,not verified,timeout (not verified),60,0
+net0_fc2,final_img1_0.08700.txt,verified,verified,1.11,1
+net0_fc2,final_img2_0.04900.txt,not verified,timeout (not verified),60,0
+net0_fc2,final_img3_0.08400.txt,verified,verified,2.826,1
+net0_fc2,final_img4_0.02800.txt,not verified,timeout (not verified),60,0
+net0_fc2,final_img5_0.09100.txt,verified,verified,1.313,1
+net0_fc2,final_img6_0.08200.txt,verified,verified,2.256,1
+net0_fc2,final_img7_0.07700.txt,verified,verified,2.137,1
+net0_fc2,final_img8_0.07900.txt,verified,verified,1.531,1
+net0_fc2,final_img9_0.08520.txt,verified,verified,3.059,1
+net1_fc2,final_img0_0.14600.txt,verified,verified,1.085,1
+net1_fc2,final_img1_0.02300.txt,not verified,timeout (not verified),60,0
+net1_fc2,final_img2_0.15100.txt,verified,verified,2.054,1
+net1_fc2,final_img3_0.18400.txt,verified,verified,1.113,1
+net1_fc2,final_img4_0.10300.txt,verified,verified,1.196,1
+net1_fc2,final_img5_0.04400.txt,not verified,timeout (not verified),60,0
+net1_fc2,final_img6_0.15800.txt,verified,verified,2.532,1
+net1_fc2,final_img7_0.12200.txt,verified,verified,1.305,1
+net1_fc2,final_img8_0.13800.txt,verified,verified,1.345,1
+net1_fc2,final_img9_0.15100.txt,verified,verified,1.251,1
+net0_fc3,final_img0_0.15100.txt,verified,verified,3.857,1
+net0_fc3,final_img1_0.14100.txt,verified,verified,1.358,1
+net0_fc3,final_img2_0.09700.txt,not verified,timeout (not verified),60,0
+net0_fc3,final_img3_0.15300.txt,verified,verified,9.975,1
+net0_fc3,final_img4_0.07400.txt,not verified,timeout (not verified),60,0
+net0_fc3,final_img5_0.12900.txt,verified,verified,1.536,1
+net0_fc3,final_img6_0.06800.txt,not verified,timeout (not verified),60,0
+net0_fc3,final_img7_0.08300.txt,not verified,timeout (not verified),60,0
+net0_fc3,final_img8_0.16400.txt,verified,verified,1.303,1
+net0_fc3,final_img9_0.12600.txt,verified,verified,1.633,1
+net1_fc3,final_img0_0.05500.txt,not verified,timeout (not verified),60,0
+net1_fc3,final_img1_0.07700.txt,verified,verified,4.724,1
+net1_fc3,final_img2_0.07600.txt,verified,verified,2.427,1
+net1_fc3,final_img3_0.08400.txt,verified,verified,4.824,1
+net1_fc3,final_img4_0.04600.txt,not verified,timeout (not verified),60,0
+net1_fc3,final_img5_0.08300.txt,verified,verified,3.769,1
+net1_fc3,final_img6_0.07200.txt,verified,verified,1.932,1
+net1_fc3,final_img7_0.08100.txt,verified,verified,3.466,1
+net1_fc3,final_img8_0.06100.txt,not verified,timeout (not verified),60,0
+net1_fc3,final_img9_0.07900.txt,verified,verified,1.254,1
+net0_fc4,final_img0_0.02800.txt,verified,verified,1.8,1
+net0_fc4,final_img1_0.01900.txt,verified,verified,2.817,1
+net0_fc4,final_img2_0.02750.txt,verified,verified,1.484,1
+net0_fc4,final_img3_0.03800.txt,verified,verified,2.605,1
+net0_fc4,final_img4_0.05500.txt,not verified,timeout (not verified),60,0
+net0_fc4,final_img5_0.04700.txt,not verified,timeout (not verified),60,0
+net0_fc4,final_img6_0.04800.txt,verified,verified,1.575,1
+net0_fc4,final_img7_0.04000.txt,verified,verified,1.549,1
+net0_fc4,final_img8_0.03900.txt,not verified,timeout (not verified),60,0
+net0_fc4,final_img9_0.03500.txt,verified,verified,3.628,1
+net1_fc4,final_img0_0.01400.txt,verified,verified,2.889,1
+net1_fc4,final_img1_0.01950.txt,verified,verified,2.744,1
+net1_fc4,final_img2_0.02500.txt,not verified,timeout (not verified),60,0
+net1_fc4,final_img3_0.01200.txt,verified,verified,1.271,1
+net1_fc4,final_img4_0.02900.txt,not verified,timeout (not verified),60,0
+net1_fc4,final_img5_0.02300.txt,not verified,timeout (not verified),60,0
+net1_fc4,final_img6_0.01850.txt,verified,verified,2.645,1
+net1_fc4,final_img7_0.01500.txt,not verified,timeout (not verified),60,0
+net1_fc4,final_img8_0.01300.txt,verified,verified,2.46,1
+net1_fc4,final_img9_0.01600.txt,verified,verified,4.349,1
+net0_fc5,final_img0_0.03100.txt,verified,verified,4.857,1
+net0_fc5,final_img1_0.08900.txt,not verified,timeout (not verified),60,0
+net0_fc5,final_img2_0.03500.txt,verified,verified,1.845,1
+net0_fc5,final_img3_0.02900.txt,verified,verified,1.954,1
+net0_fc5,final_img4_0.02900.txt,verified,verified,2.005,1
+net0_fc5,final_img5_0.03200.txt,verified,verified,2.099,1
+net0_fc5,final_img6_0.02900.txt,verified,verified,1.976,1
+net0_fc5,final_img7_0.03200.txt,verified,verified,2.265,1
+net0_fc5,final_img8_0.06700.txt,not verified,timeout (not verified),60,0
+net0_fc5,final_img9_0.02850.txt,verified,verified,2.283,1
+net1_fc5,final_img0_0.11900.txt,verified,verified,1.96,1
+net1_fc5,final_img1_0.09400.txt,verified,verified,1.824,1
+net1_fc5,final_img2_0.02500.txt,not verified,timeout (not verified),60,0
+net1_fc5,final_img3_0.09800.txt,verified,verified,2.015,1
+net1_fc5,final_img4_0.13500.txt,verified,verified,2.134,1
+net1_fc5,final_img5_0.11400.txt,verified,timeout (not verified),60,0
+net1_fc5,final_img6_0.03500.txt,verified,verified,1.866,1
+net1_fc5,final_img7_0.02800.txt,verified,verified,1.727,1
+net1_fc5,final_img8_0.04400.txt,not verified,timeout (not verified),60,0
+net1_fc5,final_img9_0.03100.txt,not verified,timeout (not verified),60,0
+
+total points: 67
